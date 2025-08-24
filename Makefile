@@ -23,7 +23,7 @@ assemble-counter: env  ## Assemble counter example to binary
 	$(UV_BIN) run python simple_asm.py counter.punch
 
 .PHONY: assemble-friendly
-assemble-friendly: env  ## Assemble friendly example to binary  
+assemble-friendly: env  ## Assemble friendly example to binary
 	$(UV_BIN) run python simple_asm.py friendly.punch
 
 .PHONY: assemble-examples
@@ -62,14 +62,14 @@ assemble-assembler: env  ## Assemble the 6502 assembler itself
 test-bootstrap: env assemble-assembler format-counter  ## Test assembler bootstrapping
 	@echo "Testing assembler self-assembly..."
 	$(UV_BIN) run python simple_6502_emulator.py \
-		--load assembler_source.bin@0200 \
+		--load assembler_source.bin@0000 \
 		--load counter.punch@1000 \
 		--start 0200 \
 		--trap 1000 \
 		--dump 2000:2FFF:bootstrap-output.bin \
 		--compare 2000:2FFF:counter.punch
 
-# Development targets  
+# Development targets
 .PHONY: format
 format: env  ## Format code with ruff
 	$(UV_BIN) run ruff format *.py
@@ -78,8 +78,12 @@ format: env  ## Format code with ruff
 lint: env  ## Lint code with ruff
 	$(UV_BIN) run ruff check *.py
 
+.PHONY: test
+test: env  ## Run pytest tests
+	$(UV_BIN) run pytest
+
 .PHONY: check
-check: lint  ## Run all checks
+check: lint test  ## Run all checks
 
 # Documentation targets
 .PHONY: docs

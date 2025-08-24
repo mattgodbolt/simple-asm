@@ -23,6 +23,11 @@ Always verify both assemblers produce identical results. The Python version is t
 
 Run full test suite with `make all` and bootstrap test with `make test-bootstrap`.
 
+## Important Environment Notes
+
+- NEVER change directory from the project root
+- ALWAYS use `uv run python` instead of just `python` to ensure correct Python version
+
 ## File Naming
 
 - .asm files: friendly format with comments

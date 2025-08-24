@@ -13,3 +13,6 @@ __pycache__/
 # Generated build artifacts
 *.bin
 *.punch
+
+# Local test directory
+tmp/
