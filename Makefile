@@ -84,8 +84,18 @@ check: lint  ## Run all checks
 # Documentation targets
 .PHONY: docs
 docs:  ## View format documentation
-	@echo "Opening format documentation..."
-	@cat format_documentation.md | head -50
+	@echo "=== Assembly Format Documentation ==="
+	@echo "Key features: Instructions, Data definitions, Relocation"
+	@echo ""
+	@echo "Data definition examples:"
+	@echo '  "HELLO"     ; String literal'
+	@echo '  #DEADBEEF   ; Hex data'
+	@echo ""
+	@echo "Relocation examples:"
+	@echo '  !1E00       ; Set offset'
+	@echo '  @0200       ; Set effective address'
+	@echo ""
+	@echo "See format_documentation.md for complete details"
 
 # Utility targets
 .PHONY: clean-outputs

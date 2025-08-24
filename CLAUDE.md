@@ -1,0 +1,36 @@
+# Simple 6502 Assembler Project
+
+Research project exploring 6502 assembly and bootstrapping. Focus on historical accuracy and minimal complexity.
+
+## Key Principles
+
+- Keep the 6502 assembler brutally simple (must be hand-assemblable)
+- Both formats (friendly .asm and punch .punch) must produce identical output
+- Every instruction is exactly 4 bytes (padded with NOPs)
+- No error checking - garbage in, garbage out
+- Historical punch card workflow simulation
+
+## Architecture
+
+- Source at $1000, output at $2000
+- Bootstrap: assembler runs at $0200 but assembles at $2000 (relocation)
+- Fixed 4-byte instructions enable simple branch offset calculation
+- Zero page variables for assembler state
+
+## Testing
+
+Always verify both assemblers produce identical results. The Python version is the reference implementation.
+
+Run full test suite with `make all` and bootstrap test with `make test-bootstrap`.
+
+## File Naming
+
+- .asm files: friendly format with comments
+- .punch files: machine format, no comments
+- .bin files: assembled machine code
+
+## Relocation System
+
+- `!xxxx` sets relocation offset
+- `@xxxx` sets effective address and fills gaps
+- Enables complex memory layouts for bootstrap scenarios

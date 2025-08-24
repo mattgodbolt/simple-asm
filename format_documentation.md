@@ -22,7 +22,7 @@ LDA# 00     ; Initialize accumulator to 0
 STA  80     ; Store in zero page location $80
 
 ; Main loop starts here  
-LOOP:
+; LOOP: (branch target for BNE instruction below)
     INCZ 80     ; Increment the counter
     LDAZ 80     ; Load counter value
     CMP# 0A     ; Compare with 10
@@ -157,5 +157,59 @@ python simple_asm.py program.punch
 
 # Results should be byte-for-byte identical
 ```
+
+## Data Definition Support
+
+Both formats support embedding data alongside code:
+
+### String Literals
+```assembly
+"HELLO"     ; Converts to ASCII bytes: 48 45 4C 4C 4F
+"MESSAGE"   ; Any text in quotes becomes raw bytes
+```
+
+### Hex Data  
+```assembly
+#DEADBEEF   ; Converts to bytes: DE AD BE EF
+#1234       ; Converts to bytes: 12 34
+```
+
+### Mixed Code and Data
+```assembly
+LDA# 42     ; Regular instruction
+"TEXT"      ; String data inline  
+#ABCD       ; Hex data
+LDX# FF     ; More instructions
+```
+
+## Relocation Directives
+
+For bootstrap and complex memory layouts, relocation directives control where code is assembled vs. where it's stored:
+
+### Relocation Offset
+```assembly
+!1E00       ; Set offset: output_address - effective_address
+            ; Example: code runs at $0200 but stored at $2000 (offset = $1E00)
+```
+
+### Address Control
+```assembly
+@0200       ; Skip effective address to $0200 (fill gap with zeros)
+@0400       ; Skip to $0400 for data tables
+```
+
+### Bootstrap Example
+```assembly
+!1E00       ; Offset so code runs at $0200 but stores at $2000
+@0200       ; Start effective address at $0200
+LDA# 42     ; Code assembled for $0200, stored at $2000
+JMP  0250   ; Jump within relocated code
+
+@0400       ; Skip to $0400 for opcode table
+"LDAX"      ; String data at effective $0400
+#BD02       ; Hex data follows
+```
+
+This enables the 6502 assembler to assemble itself: the assembler runs at $0200 but the Python assembler stores it at $2000, avoiding self-overwrite during bootstrap.
 
 This proves our bootstrap process is correct - the hand-assembled 6502 assembler will produce the same results as our reference implementation.

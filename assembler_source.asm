@@ -2,7 +2,7 @@
 ; Written in our restricted 4-byte instruction format
 ; Assembles programs from $1000 to $2000
 
-; Entry point at $0200
+; Entry point at $0200 - no relocation needed for the assembler itself
 ; Initialize source pointer to $1000
 LDA# 00     ; $0200: A9 00 EA EA
 STAZ 00     ; $0204: 85 00 EA EA  - Store to zero page $00
@@ -48,11 +48,11 @@ BCC  FA     ; $026C: 90 E8 EA EA  - Loop back to SKIP_SPACES
 INC  01     ; $0270: E6 01 EA EA
 JMP  F8     ; $0274: 4C 50 02 EA  - Jump back to SKIP_SPACES
 
-; Look up opcode in table at $0400
+; Look up opcode in table at $0500
 ; LOOKUP_OPCODE:
 LDA# 00     ; $0278: A9 00 EA EA  - Table pointer low
 STAZ 0E     ; $027C: 85 0E EA EA
-LDA# 04     ; $0280: A9 04 EA EA  - Table pointer high  
+LDA# 05     ; $0280: A9 05 EA EA  - Table pointer high  
 STAZ 0F     ; $0284: 85 0F EA EA
 
 ; Compare current table entry with opcode buffer
@@ -212,5 +212,21 @@ JMP  0220   ; $0448: 4C 20 02 EA - No, continue assembly
 ; Done! Jump to assembled program
 JMP  2000   ; $044C: 4C 00 20 EA
 
-; Opcode table starts at $0450 (moved from $0400 due to code overflow)
-; See opcode_table.md for complete data layout
+; Minimal opcode table - just what counter.punch needs
+@0500
+; LDA# = $A9, type 1 (immediate byte)
+#4C444123A901
+; STAZ = $85, type 1 (zero page byte) 
+#5354415A8501
+; INCZ = $E6, type 1 (zero page byte)
+#494E435AE601
+; LDAZ = $A5, type 1 (zero page byte)
+#4C44415AA501
+; CMP# = $C9, type 1 (immediate byte)
+#434D5023C901
+; BNE  = $D0, type 3 (branch offset)
+#424E4520D003
+; BRK  = $00, type 0 (no operand)
+#42524B200000
+; END  = $FF, type 0 (special marker)
+#454E4420FF00

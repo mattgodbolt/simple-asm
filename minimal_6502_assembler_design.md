@@ -5,10 +5,10 @@ A hand-assemblable 6502 assembler with the absolute minimum complexity needed to
 
 ## Core Constraints
 - Source code is read from address `$1000` (all numbers in hex)
-- Output is always assembled to address `$2000`
-- After assembly completes, jump to `$2000` to run the assembled program
+- Output defaults to address `$2000` (can be relocated with `!` directive)
+- After assembly completes, jump to the assembled program location
 - Every instruction is padded to exactly **4 bytes** using NOPs (`$EA`)
-- No labels, no comments, no expressions
+- No labels (use comments for documentation), no expressions
 - Addressing mode is encoded in the opcode name itself
 
 ## Instruction Format
@@ -193,9 +193,25 @@ Byte 5:    Operand type:
 - Opcode table: ~180 bytes (30 entries × 6 bytes)
 - Total: ~612 bytes
 
+## Advanced Features
+
+### Data Definition
+```
+"TEXT"      ; String literal → ASCII bytes
+#DEADBEEF   ; Hex data → raw bytes  
+```
+
+### Relocation Support
+```
+!1E00       ; Set relocation offset (output_addr - effective_addr)
+@0200       ; Set effective address to $0200, fill gap with zeros
+```
+
+This enables bootstrap: code assembled to run at $0200 but stored at $2000.
+
 ## Notes
-- No ORG directive initially (always assemble to $2000)
-- Could add ORG later by inserting NOPs until target address
+- Relocation allows flexible memory layouts for bootstrap scenarios
+- Data definition enables opcode tables and strings inline with code
 - No error checking - garbage in, garbage out
 - All hex numbers are raw (no $ prefix)
 - Mnemonics are exactly 4 characters (space-padded)
