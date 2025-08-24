@@ -10,7 +10,9 @@ authors = [
     {name = "Matt Godbolt", email = "matt@godbolt.org"},
 ]
 requires-python = ">=3.8"
-dependencies = []
+dependencies = [
+    "click>=8.1.8",
+]
 
 [project.scripts]
 simple-asm = "simple_asm:main"
