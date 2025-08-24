@@ -63,6 +63,10 @@ def parse_line(line: str) -> Optional[tuple]:
     if line.startswith(';'):
         return None
     
+    # Pass through data lines unchanged
+    if line.startswith('"') or line.startswith('#'):
+        return ("DATA", line)
+    
     # Remove inline comments
     if ';' in line:
         line = line[:line.index(';')].strip()
@@ -88,7 +92,9 @@ def parse_line(line: str) -> Optional[tuple]:
 
 def format_instruction(opcode: str, operand: str) -> str:
     """Format instruction for punch card output"""
-    if operand:
+    if opcode == "DATA":
+        return operand  # Data lines pass through unchanged
+    elif operand:
         return f"{opcode} {operand}"  # Space between opcode and operand
     else:
         return opcode

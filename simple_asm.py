@@ -136,95 +136,108 @@ class SimpleAssembler:
         output = []
         
         while True:
-            # Skip any leading whitespace
+            # Skip spaces and tabs (but not newlines)
             self._skip_spaces()
             
-            # Read 4-character opcode
-            opcode = self._read_opcode()
-            if not opcode:
-                break
-                
-            # Skip spaces after opcode
-            self._skip_spaces()
-            
-            # Look up in opcode table
-            if opcode not in self.OPCODES:
-                raise ValueError(f"Unknown opcode: '{opcode}'")
-            
-            opcode_byte, operand_type = self.OPCODES[opcode]
-            
-            # Handle END marker
-            if opcode == "END ":
+            # Peek at first character  
+            byte = self.memory.read_byte(self.source_ptr)
+            if byte == 0:  # End of source
                 break
             
-            # Read operand based on type
-            if operand_type == 0:  # No operand
-                operand_low, operand_high = 0, 0
-            elif operand_type == 1:  # Single byte
-                operand_low = self._read_hex_byte()
-                operand_high = 0
-            elif operand_type == 2:  # Two bytes (little-endian)
-                # Read as big-endian, store as little-endian
-                value = self._read_hex_word()
-                operand_low = value & 0xFF
-                operand_high = (value >> 8) & 0xFF
-            elif operand_type == 3:  # Branch offset
-                offset = self._read_hex_byte()
-                # Convert signed byte to branch offset
-                if offset > 127:
-                    offset = offset - 256
-                operand_low = (offset * 4) & 0xFF
-                operand_high = 0
+            char = chr(byte)
+            
+            # Dispatch based on first character
+            if char == ';':
+                # Comment - skip to end of line
+                self._skip_to_newline()
+            elif char == '\n' or char == '\r':
+                # Newline - just skip it
+                self.source_ptr += 1
+            elif char == '"':
+                # String data
+                data = self._read_string()
+                output.extend(data)
+            elif char == '#':
+                # Hex data
+                data = self._read_hex_data()
+                output.extend(data)
             else:
-                raise ValueError(f"Invalid operand type: {operand_type}")
-            
-            # Skip any trailing whitespace after operand
-            self._skip_spaces()
-            
-            # Generate 4-byte instruction
-            instruction = [opcode_byte, operand_low, operand_high, 0xEA]
-            
-            # Adjust based on operand type
-            if operand_type == 0:  # No operand - pad with NOPs
-                instruction = [opcode_byte, 0xEA, 0xEA, 0xEA]
-            elif operand_type == 1:  # Single byte operand
-                instruction = [opcode_byte, operand_low, 0xEA, 0xEA]
-            # Type 2 and 3 use the default format above
-            
-            output.extend(instruction)
+                # Must be an opcode
+                opcode = self._read_opcode()
+                if not opcode or not opcode.strip():
+                    break
+                    
+                # Skip spaces after opcode
+                self._skip_spaces()
+                
+                # Look up in opcode table
+                if opcode not in self.OPCODES:
+                    raise ValueError(f"Unknown opcode: '{opcode}'")
+                
+                opcode_byte, operand_type = self.OPCODES[opcode]
+                
+                # Handle END marker
+                if opcode == "END ":
+                    break
+                
+                # Read operand based on type
+                if operand_type == 0:  # No operand
+                    operand_low, operand_high = 0, 0
+                elif operand_type == 1:  # Single byte
+                    operand_low = self._read_hex_byte()
+                    operand_high = 0
+                elif operand_type == 2:  # Two bytes (little-endian)
+                    # Read as big-endian, store as little-endian
+                    value = self._read_hex_word()
+                    operand_low = value & 0xFF
+                    operand_high = (value >> 8) & 0xFF
+                elif operand_type == 3:  # Branch offset
+                    offset = self._read_hex_byte()
+                    # Convert signed byte to branch offset
+                    if offset > 127:
+                        offset = offset - 256
+                    operand_low = (offset * 4) & 0xFF
+                    operand_high = 0
+                else:
+                    raise ValueError(f"Invalid operand type: {operand_type}")
+                
+                # Skip any trailing whitespace after operand
+                self._skip_spaces()
+                
+                # Generate 4-byte instruction
+                instruction = [opcode_byte, operand_low, operand_high, 0xEA]
+                
+                # Adjust based on operand type
+                if operand_type == 0:  # No operand - pad with NOPs
+                    instruction = [opcode_byte, 0xEA, 0xEA, 0xEA]
+                elif operand_type == 1:  # Single byte operand
+                    instruction = [opcode_byte, operand_low, 0xEA, 0xEA]
+                # Type 2 and 3 use the default format above
+                
+                output.extend(instruction)
         
         return bytes(output)
     
     def _read_opcode(self) -> str:
         """Read 4-character opcode from source"""
-        while True:
-            chars = []
-            for _ in range(4):
-                byte = self.memory.read_byte(self.source_ptr)
-                if byte == 0:  # End of source
-                    return ""
-                char = chr(byte)
-                
-                # Skip comment lines - if first char is semicolon, skip to end of line
-                if char == ';' and len(chars) == 0:
-                    self._skip_to_newline()
-                    break  # Start over with next line
-                
-                # Stop if we hit whitespace or end of line
-                if char in ' \t\n\r':
-                    break
-                chars.append(char)
-                self.source_ptr += 1
+        chars = []
+        for _ in range(4):
+            byte = self.memory.read_byte(self.source_ptr)
+            if byte == 0:  # End of source
+                return ""
+            char = chr(byte)
             
-            # If we got some characters, pad and return
-            if chars:
-                # Pad to exactly 4 characters with spaces if needed
-                while len(chars) < 4:
-                    chars.append(' ')
-                return ''.join(chars)
-            
-            # If we got no characters, skip to next non-whitespace and try again
-            self._skip_spaces()
+            # Stop if we hit whitespace or end of line
+            if char in ' \t\n\r':
+                break
+            chars.append(char)
+            self.source_ptr += 1
+        
+        # Pad to exactly 4 characters with spaces if needed
+        while len(chars) < 4:
+            chars.append(' ')
+        
+        return ''.join(chars)
     
     def _skip_to_newline(self) -> None:
         """Skip characters until we hit a newline"""
@@ -238,13 +251,13 @@ class SimpleAssembler:
                 break
     
     def _skip_spaces(self) -> None:
-        """Skip whitespace characters"""
+        """Skip spaces and tabs only (not newlines)"""
         while True:
             byte = self.memory.read_byte(self.source_ptr)
             if byte == 0:  # End of source
                 break
             char = chr(byte)
-            if char not in ' \t\n\r':
+            if char not in ' \t':
                 break
             self.source_ptr += 1
     
@@ -279,6 +292,65 @@ class SimpleAssembler:
             else:
                 break
         return int(hex_chars, 16) if hex_chars else 0
+    
+    def _read_string(self) -> list:
+        """Read a string literal: "text" and return as list of bytes"""
+        # Skip opening quote
+        self.source_ptr += 1
+        
+        data = []
+        while True:
+            byte = self.memory.read_byte(self.source_ptr)
+            if byte == 0:
+                raise ValueError("Unterminated string literal")
+            
+            char = chr(byte)
+            if char == '"':
+                # Found closing quote
+                self.source_ptr += 1
+                break
+            else:
+                # Just add the character as-is
+                data.append(ord(char))
+                self.source_ptr += 1
+        
+        # Skip to end of line
+        self._skip_to_newline()
+        return data
+    
+    def _read_hex_data(self) -> list:
+        """Read hex data: #AABBCCDD and return as list of bytes"""
+        # Skip # character
+        self.source_ptr += 1
+        
+        data = []
+        hex_chars = ""
+        
+        while True:
+            byte = self.memory.read_byte(self.source_ptr)
+            if byte == 0:
+                break
+            
+            char = chr(byte)
+            if char in '0123456789ABCDEFabcdef':
+                hex_chars += char.upper()
+                self.source_ptr += 1
+            elif char in ' \t\r\n':
+                break  # End of hex data
+            else:
+                raise ValueError(f"Invalid hex character: '{char}'")
+        
+        # Convert hex string to bytes (must be even length)
+        if len(hex_chars) % 2 != 0:
+            raise ValueError(f"Hex data must have even number of digits: #{hex_chars}")
+        
+        for i in range(0, len(hex_chars), 2):
+            hex_byte = hex_chars[i:i+2]
+            data.append(int(hex_byte, 16))
+        
+        # Skip to end of line
+        self._skip_to_newline()
+        return data
 
 
 def format_hex_dump(data: bytes, base_address: int = 0x2000) -> str:
