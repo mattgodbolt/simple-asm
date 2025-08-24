@@ -9,3 +9,7 @@ __pycache__/
 .pytest_cache/
 .venv/
 .DS_Store
+
+# Generated build artifacts
+*.bin
+*.punch
