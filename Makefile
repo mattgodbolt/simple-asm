@@ -44,11 +44,11 @@ format-examples: format-counter format-friendly  ## Convert all examples to punc
 # Emulator targets
 .PHONY: run-counter
 run-counter: env assemble-counter  ## Run counter program in emulator with trace
-	$(UV_BIN) run python simple_6502_emulator.py --load counter.punch@2000 --start 2000 --trace --max-cycles 200
+	$(UV_BIN) run python simple_6502_emulator.py --load counter.bin@2000 --start 2000 --trace --max-cycles 200
 
 .PHONY: run-friendly
 run-friendly: env assemble-friendly  ## Run friendly program in emulator with trace
-	$(UV_BIN) run python simple_6502_emulator.py --load friendly.punch@2000 --start 2000 --trace --max-cycles 500
+	$(UV_BIN) run python simple_6502_emulator.py --load friendly.bin@2000 --start 2000 --trace --max-cycles 500
 
 .PHONY: test-emulator
 test-emulator: run-counter  ## Basic emulator functionality test
@@ -62,7 +62,7 @@ assemble-assembler: env  ## Assemble the 6502 assembler itself
 test-bootstrap: env assemble-assembler format-counter  ## Test assembler bootstrapping
 	@echo "Testing assembler self-assembly..."
 	$(UV_BIN) run python simple_6502_emulator.py \
-		--load assembler_source.asm@0200 \
+		--load assembler_source.bin@0200 \
 		--load counter.punch@1000 \
 		--start 0200 \
 		--trap 1000 \

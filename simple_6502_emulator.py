@@ -79,6 +79,7 @@ class CPU6502:
             0xC9: self.cmp_imm,   # CMP #nn
             0xCD: self.cmp_abs,   # CMP nnnn
             0xC5: self.cmp_zp,    # CMP nn
+            0xD1: self.cmp_ind_y, # CMP (nn),Y
             0xE0: self.cpx_imm,   # CPX #nn
             0xC0: self.cpy_imm,   # CPY #nn
             
@@ -114,6 +115,10 @@ class CPU6502:
             # Stack
             0x48: self.pha,       # PHA
             0x68: self.pla,       # PLA
+            
+            # Shift/Logic
+            0x0A: self.asl_a,     # ASL A
+            0x05: self.ora_zp,    # ORA nn
             
             # Flag operations
             0x18: self.clc,       # CLC
@@ -382,6 +387,16 @@ class CPU6502:
         self.carry = self.a >= operand
         self.set_nz(result & 0xFF)
     
+    def cmp_ind_y(self):
+        """CMP (nn),Y - Compare accumulator indirect indexed"""
+        zp_addr = self.read_pc_byte()
+        base_addr = self.memory[zp_addr] | (self.memory[(zp_addr + 1) & 0xFF] << 8)
+        addr = (base_addr + self.y) & 0xFFFF
+        operand = self.memory[addr]
+        result = self.a - operand
+        self.carry = self.a >= operand
+        self.set_nz(result & 0xFF)
+    
     def cpx_imm(self):
         """CPX #nn - Compare X immediate"""
         operand = self.read_pc_byte()
@@ -486,6 +501,20 @@ class CPU6502:
         self.a = self.pop()
         self.set_nz(self.a)
     
+    # Shift/Logic instructions
+    def asl_a(self):
+        """ASL A - Arithmetic shift left accumulator"""
+        self.carry = (self.a & 0x80) != 0
+        self.a = (self.a << 1) & 0xFF
+        self.set_nz(self.a)
+    
+    def ora_zp(self):
+        """ORA nn - OR accumulator with zero page"""
+        addr = self.read_pc_byte()
+        operand = self.memory[addr]
+        self.a |= operand
+        self.set_nz(self.a)
+    
     # Flag instructions
     def clc(self):
         """CLC - Clear carry flag"""
@@ -586,6 +615,11 @@ class CPU6502:
             0xA5: "LDA $%02X",
             0x8D: "STA $%04X",
             0x85: "STA $%02X",
+            0xE6: "INC $%02X",    # INC zero page
+            0xC9: "CMP #$%02X",   # CMP immediate
+            0x18: "CLC",          # Clear carry
+            0x69: "ADC #$%02X",   # ADC immediate  
+            0xA2: "LDX #$%02X",   # LDX immediate
             0xE8: "INX",
             0xCA: "DEX",
             0xC8: "INY",

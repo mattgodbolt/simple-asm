@@ -48,7 +48,8 @@ class SimpleAssembler:
         "LDA ": (0xAD, 2),  # Load A absolute
         "LDAZ": (0xA5, 1),  # Load A zero page
         "LDAX": (0xBD, 2),  # Load A absolute,X
-        "LDAY": (0xB9, 2),  # Load A absolute,Y
+        "LDAY": (0xB1, 1),  # Load A (zero page),Y
+        "LDYA": (0xB9, 2),  # Load A absolute,Y
         
         "LDX#": (0xA2, 1),  # Load X immediate
         "LDX ": (0xAE, 2),  # Load X absolute
@@ -61,7 +62,8 @@ class SimpleAssembler:
         "STA ": (0x8D, 2),  # Store A absolute
         "STAZ": (0x85, 1),  # Store A zero page
         "STAX": (0x9D, 2),  # Store A absolute,X
-        "STAY": (0x99, 2),  # Store A absolute,Y
+        "STAY": (0x91, 1),  # Store A (zero page),Y
+        "STYA": (0x99, 2),  # Store A absolute,Y
         
         "STX ": (0x8E, 2),  # Store X absolute
         "STXZ": (0x86, 1),  # Store X zero page
@@ -72,9 +74,13 @@ class SimpleAssembler:
         "ADC#": (0x69, 1),  # Add with carry immediate
         "SBC#": (0xE9, 1),  # Subtract with carry immediate
         
+        "ASL ": (0x0A, 0),  # Arithmetic shift left A
+        "ORA ": (0x05, 1),  # OR A with zero page
+        
         "CMP#": (0xC9, 1),  # Compare A immediate
         "CMP ": (0xCD, 2),  # Compare A absolute
         "CMPZ": (0xC5, 1),  # Compare A zero page
+        "CMPY": (0xD1, 1),  # Compare A (zero page),Y
         
         "CPX#": (0xE0, 1),  # Compare X immediate
         "CPY#": (0xC0, 1),  # Compare Y immediate
@@ -306,7 +312,13 @@ def main():
         print(format_hex_dump(output))
         
         # Write binary output
-        output_file = source_file.replace('.asm', '.bin')
+        if source_file.endswith('.asm'):
+            output_file = source_file.replace('.asm', '.bin')
+        elif source_file.endswith('.punch'):
+            output_file = source_file.replace('.punch', '.bin')
+        else:
+            output_file = source_file + '.bin'
+        
         with open(output_file, 'wb') as f:
             f.write(output)
         print(f"\nBinary written to {output_file}")
