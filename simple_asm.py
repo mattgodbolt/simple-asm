@@ -124,6 +124,8 @@ class SimpleAssembler:
         self.memory = Memory()
         self.source_ptr = 0x1000  # Source starts at $1000
         self.output_ptr = 0x2000  # Output starts at $2000
+        self.effective_pc = 0  # Effective address (where code thinks it is)
+        self.reloc_offset = 0  # Offset to add to effective address for output
     
     def assemble_from_string(self, source: str) -> bytes:
         """Assemble source code from string"""
@@ -157,10 +159,20 @@ class SimpleAssembler:
                 # String data
                 data = self._read_string()
                 output.extend(data)
+                self.effective_pc += len(data)
             elif char == '#':
                 # Hex data
                 data = self._read_hex_data()
                 output.extend(data)
+                self.effective_pc += len(data)
+            elif char == '!':
+                # Relocation offset: !1E00
+                offset = self._read_reloc_offset()
+                self.reloc_offset = offset
+            elif char == '@':
+                # Address directive: @0400
+                target_addr = self._read_address_directive()
+                self._skip_to_address(target_addr, output)
             else:
                 # Must be an opcode
                 opcode = self._read_opcode()
@@ -215,6 +227,8 @@ class SimpleAssembler:
                 # Type 2 and 3 use the default format above
                 
                 output.extend(instruction)
+                # Update effective PC (each instruction is 4 bytes)
+                self.effective_pc += 4
         
         return bytes(output)
     
@@ -351,6 +365,68 @@ class SimpleAssembler:
         # Skip to end of line
         self._skip_to_newline()
         return data
+    
+    def _read_reloc_offset(self) -> int:
+        """Read relocation offset: !1E00 and return as integer"""
+        # Skip ! character
+        self.source_ptr += 1
+        
+        hex_chars = ""
+        for _ in range(4):
+            byte = self.memory.read_byte(self.source_ptr)
+            if byte == 0:
+                raise ValueError("Incomplete relocation offset")
+            
+            char = chr(byte)
+            if char in '0123456789ABCDEFabcdef':
+                hex_chars += char.upper()
+                self.source_ptr += 1
+            else:
+                break
+        
+        if len(hex_chars) != 4:
+            raise ValueError(f"Relocation offset must be 4 hex digits: !{hex_chars}")
+        
+        # Skip to end of line
+        self._skip_to_newline()
+        return int(hex_chars, 16)
+    
+    def _read_address_directive(self) -> int:
+        """Read address directive: @0400 and return as integer"""
+        # Skip @ character
+        self.source_ptr += 1
+        
+        hex_chars = ""
+        for _ in range(4):
+            byte = self.memory.read_byte(self.source_ptr)
+            if byte == 0:
+                raise ValueError("Incomplete address directive")
+            
+            char = chr(byte)
+            if char in '0123456789ABCDEFabcdef':
+                hex_chars += char.upper()
+                self.source_ptr += 1
+            else:
+                break
+        
+        if len(hex_chars) != 4:
+            raise ValueError(f"Address directive must be 4 hex digits: @{hex_chars}")
+        
+        # Skip to end of line
+        self._skip_to_newline()
+        return int(hex_chars, 16)
+    
+    def _skip_to_address(self, target_addr: int, output: list) -> None:
+        """Skip effective PC forward to target address, filling gap with zeros"""
+        if target_addr < self.effective_pc:
+            raise ValueError(f"Cannot go backwards: @{target_addr:04X} < {self.effective_pc:04X}")
+        
+        # Fill gap with zeros
+        gap_size = target_addr - self.effective_pc
+        output.extend([0] * gap_size)
+        
+        # Update effective PC
+        self.effective_pc = target_addr
 
 
 def format_hex_dump(data: bytes, base_address: int = 0x2000) -> str:

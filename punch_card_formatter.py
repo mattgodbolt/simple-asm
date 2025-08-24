@@ -63,8 +63,8 @@ def parse_line(line: str) -> Optional[tuple]:
     if line.startswith(';'):
         return None
     
-    # Pass through data lines unchanged
-    if line.startswith('"') or line.startswith('#'):
+    # Pass through data lines and directives unchanged
+    if line.startswith('"') or line.startswith('#') or line.startswith('!') or line.startswith('@'):
         return ("DATA", line)
     
     # Remove inline comments
