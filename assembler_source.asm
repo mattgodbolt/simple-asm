@@ -15,6 +15,7 @@ STAZ 02     ; $0214: 85 02 EA EA  - Store to zero page $02
 LDA# 20     ; $0218: A9 20 EA EA
 STAZ 03     ; $021C: 85 03 EA EA  - Store to zero page $03
 
+@0220       ; Align main loop to clean address with room for growth
 ; Main assembly loop
 ; Read 4-character opcode into buffer at $05-$08
 ; MAIN_LOOP:
@@ -48,6 +49,7 @@ BCC  FA     ; $026C: 90 E8 EA EA  - Loop back to SKIP_SPACES
 INCZ 01     ; $0270: E6 01 EA EA
 JMP  0250   ; $0274: 4C 50 02 EA  - Jump back to SKIP_SPACES
 
+@0280       ; Align table lookup section with room for expansion
 ; Look up opcode in table at $0500
 ; LOOKUP_OPCODE:
 LDA# 00     ; $0278: A9 00 EA EA  - Table pointer low
@@ -90,6 +92,7 @@ CMP# 06     ; $02DC: C9 06 EA EA  - Past $0600?
 BCC  E9     ; $02E0: 90 A4 EA EA  - No, continue TABLE_LOOP
 BRK         ; $02E4: 00 EA EA EA  - Error - opcode not found
 
+@0300       ; Align operand reading section
 ; Read operand based on type in $0C
 ; READ_OPERAND:
 LDAZ 0C     ; $0300: A5 0C EA EA  - Get operand type
@@ -99,7 +102,7 @@ BEQ  04     ; $030C: F0 10 EA EA  - Yes, goto READ_BYTE
 CMP# 02     ; $0310: C9 02 EA EA  - Type 2: two bytes
 BEQ  08     ; $0314: F0 20 EA EA  - Yes, goto READ_WORD
 ; Must be type 3: branch
-JSR  3A     ; $0318: 20 5C 03 EA  - Call READ_BYTE
+JSR  0340   ; $0318: 20 40 03 EA  - Call READ_BYTE
 ; Multiply by 4 for branch offset and add 2
 LDAZ 09     ; $031C: A5 09 EA EA  - Get byte value
 ASL         ; $0320: 0A EA EA EA  - Shift left (×2)
@@ -107,44 +110,48 @@ ASL         ; $0324: 0A EA EA EA  - Shift left (×4)
 CLC         ; $0328: 18 EA EA EA  - Clear carry
 ADC# 02     ; $032C: 69 02 EA EA  - Add 2 to compensate for PC offset
 STAZ 09     ; $0330: 85 09 EA EA  - Store result
-JMP  037C   ; $0334: 4C 7C 03 EA  - Jump to WRITE_INST
+JMP  0420   ; $0334: 4C 20 04 EA  - Jump to WRITE_INST
 
+@0340       ; Align READ_BYTE routine
 ; Read single byte operand
 ; READ_BYTE:
-JSR  2E     ; $0330: 20 5C 03 EA  - Call hex conversion
+JSR  0380   ; $0340: 20 80 03 EA  - Call hex conversion
 STAZ 09     ; $0334: 85 09 EA EA  - Store low byte
 LDA# 00     ; $0338: A9 00 EA EA
 STAZ 0A     ; $033C: 85 0A EA EA  - Clear high byte
-JMP  037C   ; $0340: 4C 7C 03 EA  - Jump to WRITE_INST
+JMP  0420   ; $034C: 4C 20 04 EA  - Jump to WRITE_INST
 
+@0360       ; Align READ_WORD routine
 ; Read two-byte operand (little-endian)
 ; READ_WORD:
-JSR  26     ; $0344: 20 5C 03 EA  - Call hex conversion
+JSR  0380   ; $0360: 20 80 03 EA  - Call hex conversion
 STAZ 0A     ; $0348: 85 0A EA EA  - Store as high byte
-JSR  22     ; $034C: 20 5C 03 EA  - Call hex conversion again
+JSR  0380   ; $0364: 20 80 03 EA  - Call hex conversion again
 STAZ 09     ; $0350: 85 09 EA EA  - Store as low byte
-JMP  037C   ; $0354: 4C 7C 03 EA  - Jump to WRITE_INST
+JMP  0420   ; $0370: 4C 20 04 EA  - Jump to WRITE_INST
 
+@0380       ; Align HEX_TO_BYTE routine
 ; Convert 2 hex digits to byte in A
 ; Advances source pointer by 2
 ; HEX_TO_BYTE:
 LDAY 00     ; $0358: B1 00 EA EA  - Get first hex digit
-JSR  12     ; $035C: 20 98 03 EA  - Convert to nibble
+JSR  03D0   ; $0384: 20 D0 03 EA  - Convert to nibble
 ASL         ; $0360: 0A EA EA EA  - Shift to high nibble
 ASL         ; $0364: 0A EA EA EA
 ASL         ; $0368: 0A EA EA EA
 ASL         ; $036C: 0A EA EA EA
 STAZ 0D     ; $0370: 85 0D EA EA  - Save high nibble
 ; Advance source pointer
-JSR  15     ; $0374: 20 B8 03 EA  - Call ADVANCE_SOURCE
+JSR  03F0   ; $0390: 20 F0 03 EA  - Call ADVANCE_SOURCE
 LDAY 00     ; $0378: B1 00 EA EA  - Get second hex digit
-JSR  08     ; $037C: 20 98 03 EA  - Convert to nibble
+JSR  03D0   ; $0394: 20 D0 03 EA  - Convert to nibble
 ORAZ 0D     ; $0380: 05 0D EA EA  - Combine with high nibble
 STAZ 04     ; $0384: 85 04 EA EA  - Store complete byte
-JSR  0D     ; $0388: 20 B8 03 EA  - Advance source again
+JSR  03F0   ; $0398: 20 F0 03 EA  - Advance source again
 LDAZ 04     ; $038C: A5 04 EA EA  - Return byte in A
 RTS         ; $0390: 60 EA EA EA
 
+@03D0       ; Align HEX_NIBBLE routine
 ; Convert single hex ASCII char to nibble (0-F)
 ; Input: A = ASCII char, Output: A = nibble
 ; HEX_CHAR_TO_NIBBLE:
@@ -155,6 +162,7 @@ RTS         ; $03A0: 60 EA EA EA
 SBC# 36     ; $03A4: E9 36 EA EA  - Convert 'A'-'F' (subtract 'A'-10-1)
 RTS         ; $03A8: 60 EA EA EA
 
+@03F0       ; Align ADVANCE_SOURCE routine
 ; Advance source pointer by 1
 ; ADVANCE_SOURCE:
 CLC         ; $03AC: 18 EA EA EA
@@ -165,6 +173,7 @@ BCC  02     ; $03BC: 90 08 EA EA  - Skip if no carry
 INCZ 01     ; $03C0: E6 01 EA EA  - Increment high byte
 RTS         ; $03C4: 60 EA EA EA
 
+@0420       ; Align WRITE_INST routine
 ; Write instruction to output
 ; WRITE_INST:
 LDY# 00     ; $03C8: A0 00 EA EA  - Initialize output index
@@ -184,7 +193,7 @@ INY         ; $03F0: C8 EA EA EA  - Next position
 LDAZ 0A     ; $03F4: A5 0A EA EA  - Get high byte
 STIY 02     ; $03F8: 91 02 EA EA  - Write it
 INY         ; $03FC: C8 EA EA EA  - Next position
-JMP  041C   ; $0400: 4C 1C 04 EA  - Jump to write final NOP
+JMP  0480   ; $0440: 4C 80 04 EA  - Jump to write final NOP
 
 ; WRITE_BYTE:
 LDAZ 09     ; $0404: A5 09 EA EA  - Get operand byte
@@ -194,6 +203,7 @@ LDA# EA     ; $0410: A9 EA EA EA  - NOP opcode
 STIY 02     ; $0414: 91 02 EA EA  - Write NOP
 INY         ; $0418: C8 EA EA EA  - Next position
 
+@0480       ; Align final NOP writing section
 ; WRITE_NOPS:
 LDA# EA     ; $041C: A9 EA EA EA  - NOP opcode
 STIY 02     ; $0420: 91 02 EA EA  - Write final NOP
@@ -205,6 +215,7 @@ STAZ 02     ; $0430: 85 02 EA EA
 BCC  02     ; $0434: 90 08 EA EA  - Skip if no carry
 INCZ 03     ; $0438: E6 03 EA EA  - Increment high byte
 
+@04A0       ; Align end check section
 ; Check for END marker (special opcode $FF)
 LDAZ 0B     ; $043C: A5 0B EA EA  - Get opcode
 CMP# FF     ; $0440: C9 FF EA EA  - Is it END marker?
