@@ -144,7 +144,7 @@ def resolve_branch_offset(from_instruction: int, to_instruction: int) -> str:
 def convert_to_punch_format(source_lines: list[str]) -> list[str]:
     """Convert friendly source to punch card format with label resolution"""
     # First pass: parse all lines and collect labels
-    parsed_lines = []
+    parsed_lines: list[tuple[str, str, int]] = []
     labels = {}  # label_name -> instruction_index
 
     for line_no, line in enumerate(source_lines, 1):

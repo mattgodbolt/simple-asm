@@ -18,16 +18,16 @@ STAZ 03
 MAIN_LOOP:
     ; Skip any leading whitespace
     JSR  SKIP_SPACES
-    
+
     ; Read opcode (up to 4 chars or until whitespace)
     LDY# 00
     LDX# 00
-    
+
 READ_OPCODE_LOOP:
     LDAY 00     ; Read character from source
     CMP# 20     ; Space?
     BEQ  OPCODE_DONE
-    CMP# 0A     ; Newline?  
+    CMP# 0A     ; Newline?
     BEQ  OPCODE_DONE
     CMP# 0D     ; Carriage return?
     BEQ  OPCODE_DONE
@@ -35,14 +35,14 @@ READ_OPCODE_LOOP:
     BEQ  OPCODE_DONE
     CMP# 00     ; End of source?
     BEQ  ASSEMBLY_DONE
-    
+
     ; Store character in opcode buffer
     STAX 05
     INX
     JSR  ADVANCE_SOURCE
     CPX# 04     ; Read 4 chars max
     BNE  READ_OPCODE_LOOP
-    
+
 OPCODE_DONE:
     ; Pad opcode buffer to 4 chars with spaces
 PAD_LOOP:
@@ -52,14 +52,14 @@ PAD_LOOP:
     STAX 05
     INX
     JMP  PAD_LOOP
-    
+
 OPCODE_READY:
     ; Skip whitespace after opcode
     JSR  SKIP_SPACES
-    
+
     ; Look up opcode in table
     JSR  LOOKUP_OPCODE
-    
+
     ; Read operand based on type
     LDA  0C     ; Get operand type
     BEQ  NO_OPERAND
@@ -75,13 +75,13 @@ OPCODE_READY:
     ASL
     STAZ 09
     JMP  WRITE_INSTRUCTION
-    
+
 READ_BYTE_OPERAND:
     JSR  READ_HEX_BYTE
     LDA# 00
     STAZ 0A
     JMP  WRITE_INSTRUCTION
-    
+
 READ_WORD_OPERAND:
     JSR  READ_HEX_WORD
     ; Store as little-endian
@@ -89,27 +89,27 @@ READ_WORD_OPERAND:
     JSR  READ_HEX_WORD
     STAZ 09     ; Low byte
     JMP  WRITE_INSTRUCTION
-    
+
 NO_OPERAND:
     LDA# 00
     STAZ 09
     STAZ 0A
-    
+
 WRITE_INSTRUCTION:
     ; Skip any trailing whitespace after operand
     JSR  SKIP_SPACES
-    
+
     ; Check for END marker
     LDA  0B
     CMP# FF
     BEQ  ASSEMBLY_DONE
-    
+
     ; Write 4-byte instruction
     LDY# 00
     LDA  0B     ; Opcode
     STAY 02
     INY
-    
+
     ; Write operand bytes based on type
     LDA  0C
     BEQ  WRITE_NOPS_ALL
@@ -123,7 +123,7 @@ WRITE_INSTRUCTION:
     STAY 02
     INY
     JMP  WRITE_FINAL_NOP
-    
+
 WRITE_BYTE_AND_NOPS:
     LDA  09
     STAY 02
@@ -132,7 +132,7 @@ WRITE_BYTE_AND_NOPS:
     STAY 02
     INY
     JMP  WRITE_FINAL_NOP
-    
+
 WRITE_NOPS_ALL:
     LDA# EA
     STAY 02
@@ -140,11 +140,11 @@ WRITE_NOPS_ALL:
     LDA# EA
     STAY 02
     INY
-    
+
 WRITE_FINAL_NOP:
     LDA# EA
     STAY 02
-    
+
     ; Advance output pointer by 4
     CLC
     LDA  02
@@ -152,7 +152,7 @@ WRITE_FINAL_NOP:
     STAZ 02
     BCC  CONTINUE_MAIN
     INC  03
-    
+
 CONTINUE_MAIN:
     JMP  MAIN_LOOP
 
@@ -174,7 +174,7 @@ SKIP_SPACES:
 SKIP_ONE:
     JSR  ADVANCE_SOURCE
     JMP  SKIP_SPACES
-    
+
 ADVANCE_SOURCE:
     CLC
     LDA  00
@@ -203,7 +203,7 @@ READ_HEX_BYTE:
     STAZ 09
     JSR  ADVANCE_SOURCE
     RTS
-    
+
 READ_HEX_WORD:
     JSR  READ_HEX_BYTE
     LDA  09
@@ -212,7 +212,7 @@ READ_HEX_WORD:
     LDA  09     ; Second byte in A
     LDX  0D     ; First byte in X
     RTS
-    
+
 HEX_TO_NIBBLE:
     CMP# 41     ; 'A'
     BCS  HEX_LETTER
@@ -220,7 +220,7 @@ HEX_TO_NIBBLE:
     SBC# 30     ; '0'
     RTS
 HEX_LETTER:
-    SEC  
+    SEC
     SBC# 37     ; 'A' - 10
     RTS
 

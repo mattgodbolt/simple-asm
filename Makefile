@@ -60,7 +60,7 @@ format-assembler: env  ## Convert assembler source to punch format
 
 .PHONY: assemble-assembler
 assemble-assembler: env  ## Assemble the 6502 assembler itself
-	$(UV_BIN) run python simple_asm.py assembler_source.punch
+	$(UV_BIN) run python simple_asm.py assembler_source.asm
 
 .PHONY: test-bootstrap
 test-bootstrap: env assemble-assembler format-assembler  ## Test assembler bootstrapping

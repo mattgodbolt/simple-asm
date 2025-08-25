@@ -60,7 +60,7 @@ A9 2A    ; What's this supposed to be?
 ```
 LDA# 042  ; Load immediate 42 (padded to 3 bytes total)
 ADC# 013  ; Add immediate 13
-STA  200  ; Store to absolute address 200  
+STA  200  ; Store to absolute address 200
 JMP  -03  ; Jump back 3 instructions
 ```
 
@@ -83,7 +83,7 @@ JMP  -03  ; Jump back 3 instructions
 *[Show the same program in the 4-character assembly format]*
 ```
 LDA# 042
-ADC# 013  
+ADC# 013
 STA  200
 ```
 

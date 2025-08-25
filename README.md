@@ -29,13 +29,13 @@ Data definition:
 - `#DEADBEEF` - hex data
 
 Relocation for bootstrap:
-- `!1E00` - set relocation offset  
+- `!1E00` - set relocation offset
 - `@0200` - set effective address
 
 ## Files
 
 - `simple_asm.py` - Python reference assembler
-- `simple_6502_emulator.py` - 6502 CPU emulator  
+- `simple_6502_emulator.py` - 6502 CPU emulator
 - `punch_card_formatter.py` - Format converter
 - `assembler_source.asm` - The 6502 assembler source
 - `example_*.asm` - Test programs

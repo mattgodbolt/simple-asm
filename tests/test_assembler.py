@@ -78,6 +78,7 @@ class TestAssembler:
     def test_relocation_directive(self):
         """Test that relocation directives work correctly."""
         test_asm = """
+        !0000
         @0300
         LDA# 42
         BRK
@@ -96,9 +97,9 @@ class TestAssembler:
             with open(bin_path, "rb") as bf:
                 data = bf.read()
 
-            # Data should start at offset 0x300, first 0x300 bytes should be zeros
+            # Data should start at offset 0x8300, first 0x300 bytes should be zeros
             assert data[0:0x300] == bytes(0x300)  # Zeros
-            assert data[0x300:0x304] == bytes([0xA9, 0x42, 0xEA, 0xEA])  # LDA #42 at $0300
+            assert data[0x300:0x304] == bytes([0xA9, 0x42, 0xEA, 0xEA])  # LDA #42 at $8300
             assert data[0x304:0x308] == bytes([0x00, 0xEA, 0xEA, 0xEA])  # BRK
 
             # Cleanup

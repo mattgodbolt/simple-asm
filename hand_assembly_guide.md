@@ -77,7 +77,7 @@ The opcode table should be placed starting at $0450 (after the main code):
 Address  | Data                    | Meaning
 ---------|-------------------------|------------------
 $0450    | 4C 44 41 23 A9 01      | "LDA#" -> $A9, type 1
-$0456    | 4C 44 41 20 AD 02      | "LDA " -> $AD, type 2  
+$0456    | 4C 44 41 20 AD 02      | "LDA " -> $AD, type 2
 $045C    | 4C 44 41 5A A5 01      | "LDAZ" -> $A5, type 1
 ...      | (continue for all opcodes)
 ```
@@ -90,7 +90,7 @@ See `opcode_table.md` for the complete table layout.
 1. Set address switches to $0200
 2. Set data switches to $A9 (first byte)
 3. Press DEPOSIT
-4. Set data switches to $00 (second byte)  
+4. Set data switches to $00 (second byte)
 5. Press DEPOSIT NEXT
 6. Continue for all bytes...
 

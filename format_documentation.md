@@ -21,7 +21,7 @@ This is what you'd write by hand or type for human consumption:
 LDA# 00     ; Initialize accumulator to 0
 STA  80     ; Store in zero page location $80
 
-; Main loop starts here  
+; Main loop starts here
 ; LOOP: (branch target for BNE instruction below)
     INCZ 80     ; Increment the counter
     LDAZ 80     ; Load counter value
@@ -35,7 +35,7 @@ END         ; End of source
 
 ### Paper Format Features:
 - **Comments**: Lines starting with `;` are ignored
-- **Inline comments**: Everything after `;` on a line is ignored  
+- **Inline comments**: Everything after `;` on a line is ignored
 - **Flexible whitespace**: Blank lines, indentation, spacing for readability
 - **Labels**: `LOOP:` (conceptual - not implemented in minimal version)
 - **Mixed case**: `lda#`, `LDA#`, `Lda#` all accepted
@@ -52,8 +52,8 @@ INCZ80
 LDAZ80
 CMP#0A
 BNE FB
-BRK 
-END 
+BRK
+END
 ```
 
 ### Punch Card Format Requirements:
@@ -108,7 +108,7 @@ Real programmers in the 1960s-70s followed this exact workflow:
 ### Modern Parallel
 This mirrors modern development:
 - **Source code**: Human-readable with comments
-- **Minification**: Compressed for transmission/storage  
+- **Minification**: Compressed for transmission/storage
 - **Compilation**: Machine-readable output
 
 ## Example Workflow
@@ -126,8 +126,8 @@ This mirrors modern development:
    ```
    LDA#42
    STA 2000
-   BRK 
-   END 
+   BRK
+   END
    ```
 
 3. **Hand-assemble** the punch card format using our 6502 assembler
@@ -138,7 +138,7 @@ This mirrors modern development:
 
 Our minimal 6502 assembler has strict memory limits:
 - **Source input**: $1000-$1FFF (4KB max)
-- **Machine output**: $2000-$2FFF (4KB max)  
+- **Machine output**: $2000-$2FFF (4KB max)
 - **Assembler code**: ~600 bytes
 
 The punch card format maximizes use of this limited space by eliminating all non-essential characters.
@@ -148,7 +148,7 @@ The punch card format maximizes use of this limited space by eliminating all non
 Both the Python assembler (friendly format) and our 6502 assembler (punch card format) should produce identical machine code:
 
 ```bash
-# Assemble with Python (friendly format)  
+# Assemble with Python (friendly format)
 python simple_asm.py program.asm
 
 # Convert and assemble with 6502 format
@@ -168,7 +168,7 @@ Both formats support embedding data alongside code:
 "MESSAGE"   ; Any text in quotes becomes raw bytes
 ```
 
-### Hex Data  
+### Hex Data
 ```assembly
 #DEADBEEF   ; Converts to bytes: DE AD BE EF
 #1234       ; Converts to bytes: 12 34
@@ -177,7 +177,7 @@ Both formats support embedding data alongside code:
 ### Mixed Code and Data
 ```assembly
 LDA# 42     ; Regular instruction
-"TEXT"      ; String data inline  
+"TEXT"      ; String data inline
 #ABCD       ; Hex data
 LDX# FF     ; More instructions
 ```

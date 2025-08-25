@@ -8,7 +8,7 @@ The opcode table starts at $0400 with 6-byte entries. Here's the complete specif
 Address  | Mnemonic | Opcode | Type | Description
 ---------|----------|--------|------|------------------
 $0400-05 | "LDA#"   | $A9    | 1    | Load A immediate
-$0406-0B | "LDA "   | $AD    | 2    | Load A absolute  
+$0406-0B | "LDA "   | $AD    | 2    | Load A absolute
 $040C-11 | "LDAZ"   | $A5    | 1    | Load A zero page
 $0412-17 | "LDAX"   | $BD    | 2    | Load A absolute,X
 $0418-1D | "LDAY"   | $B9    | 2    | Load A absolute,Y
@@ -17,7 +17,7 @@ $041E-23 | "LDX#"   | $A2    | 1    | Load X immediate
 $0424-29 | "LDX "   | $AE    | 2    | Load X absolute
 $042A-2F | "LDXZ"   | $A6    | 1    | Load X zero page
 
-$0430-35 | "LDY#"   | $A0    | 1    | Load Y immediate  
+$0430-35 | "LDY#"   | $A0    | 1    | Load Y immediate
 $0436-3B | "LDY "   | $AC    | 2    | Load Y absolute
 $043C-41 | "LDYZ"   | $A4    | 1    | Load Y zero page
 
@@ -62,7 +62,7 @@ $04EA-EF | "JSR "   | $20    | 2    | Jump to subroutine
 $04F0-F5 | "RTS "   | $60    | 0    | Return from subroutine
 
 $04F6-FB | "BEQ "   | $F0    | 3    | Branch if equal
-$04FC-01 | "BNE "   | $D0    | 3    | Branch if not equal  
+$04FC-01 | "BNE "   | $D0    | 3    | Branch if not equal
 $0502-07 | "BCS "   | $B0    | 3    | Branch if carry set
 $0508-0D | "BCC "   | $90    | 3    | Branch if carry clear
 
@@ -81,9 +81,9 @@ $0532-37 | "END "   | $FF    | 0    | End of source (special)
 
 Starting at $0400:
 ```
-$0400: 4C 44 41 23    ; "LDA#" 
+$0400: 4C 44 41 23    ; "LDA#"
 $0404: A9 01          ; $A9, type 1
-$0406: 4C 44 41 20    ; "LDA " 
+$0406: 4C 44 41 20    ; "LDA "
 $040A: AD 02          ; $AD, type 2
 $040C: 4C 44 41 5A    ; "LDAZ"
 $0410: A5 01          ; $A5, type 1
@@ -93,13 +93,13 @@ $0410: A5 01          ; $A5, type 1
 ## Type Codes
 - **Type 0**: No operand (implied instructions)
   - Output: [opcode] EA EA EA
-  
+
 - **Type 1**: Single byte operand
   - Output: [opcode] [operand] EA EA
-  
+
 - **Type 2**: Two byte operand (little-endian)
   - Output: [opcode] [low-byte] [high-byte] EA
-  
+
 - **Type 3**: Branch offset (multiply by 4 for 4-byte instruction spacing)
   - Input: signed instruction count (-128 to +127)
   - Output: [opcode] [offset*4] EA EA
@@ -111,7 +111,7 @@ The "END " opcode ($FF) is not a real 6502 instruction - it's used by the assemb
 
 ### Branch Calculation Examples
 - `BNE  01` = branch forward 1 instruction = offset +4 = $04
-- `BEQ  03` = branch forward 3 instructions = offset +12 = $0C  
+- `BEQ  03` = branch forward 3 instructions = offset +12 = $0C
 - `BNE  FF` = branch back 1 instruction = offset -4 = $FC
 - `BEQ  FD` = branch back 3 instructions = offset -12 = $F4
 

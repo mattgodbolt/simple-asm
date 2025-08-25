@@ -13,7 +13,7 @@ STAZ 80     ; counter = 0 (store in zero page)
     LDAZ 80     ; A = counter
     CMP# 0A     ; compare with 10
     BNE  FB     ; if A != 10, go back 5 instructions to INCZ
-    
+
 ; Counter reached 10 - we're done
 BRK         ; Stop execution
 END         ; End of source code

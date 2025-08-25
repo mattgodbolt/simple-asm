@@ -42,7 +42,7 @@ All instructions generate exactly 4 bytes:
 | `STX ` | `$8E` | Absolute | `STX  2000` | `8E 00 20 EA` |
 | `STY ` | `$8C` | Absolute | `STY  2000` | `8C 00 20 EA` |
 
-### Indexed Operations  
+### Indexed Operations
 | Mnemonic | Opcode | Mode | Example | Output |
 |----------|--------|------|---------|--------|
 | `LDAX` | `$BD` | Absolute,X | `LDAX 3000` | `BD 00 30 EA` |
@@ -162,7 +162,7 @@ $2000-2FFF: Assembled output
 ## Zero Page Variables ($00-$1F)
 ```
 $00-01: Source pointer (16-bit, starts at $1000)
-$02-03: Output pointer (16-bit, starts at $2000) 
+$02-03: Output pointer (16-bit, starts at $2000)
 $04:    Current character from source
 $05-08: Opcode buffer (4 ASCII chars)
 $09:    Operand low byte
@@ -182,7 +182,7 @@ Bytes 0-3: ASCII mnemonic (e.g., "LDA#", "BNE ", "JSR ")
 Byte 4:    6502 opcode value
 Byte 5:    Operand type:
            0 = No operand (implied)
-           1 = 1-byte operand 
+           1 = 1-byte operand
            2 = 2-byte operand (little-endian)
            3 = Branch offset (multiply operand by 4)
 ```
@@ -198,7 +198,7 @@ Byte 5:    Operand type:
 ### Data Definition
 ```
 "TEXT"      ; String literal → ASCII bytes
-#DEADBEEF   ; Hex data → raw bytes  
+#DEADBEEF   ; Hex data → raw bytes
 ```
 
 ### Relocation Support

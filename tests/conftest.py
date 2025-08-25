@@ -29,12 +29,12 @@ def load_binary(cpu: CPU6502, data: bytes, address: int = 0) -> None:
     cpu.memory[address : address + len(data)] = data
 
 
-def load_source(cpu: CPU6502, source: bytes, address: int = 0x1000) -> None:
+def load_source(cpu: CPU6502, source: bytes, address: int = 0x2000) -> None:
     """Load source code into CPU memory at specified address."""
     cpu.memory[address : address + len(source)] = source
 
 
-def get_opcode_table_entry(data: bytes, index: int, table_offset: int = 0x500) -> tuple[bytes, int, int]:
+def get_opcode_table_entry(data: bytes, index: int, table_offset: int = 0x1000) -> tuple[bytes, int, int]:
     """Extract an opcode table entry from binary data.
 
     Returns: (mnemonic, opcode, type)
@@ -49,7 +49,7 @@ def get_opcode_table_entry(data: bytes, index: int, table_offset: int = 0x500) -
     return mnemonic, opcode, optype
 
 
-def find_in_opcode_table(data: bytes, mnemonic: bytes, table_offset: int = 0x500) -> tuple[int, int, int] | None:
+def find_in_opcode_table(data: bytes, mnemonic: bytes, table_offset: int = 0x1000) -> tuple[int, int, int] | None:
     """Find a mnemonic in the opcode table.
 
     Returns: (index, opcode, type) or None if not found

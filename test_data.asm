@@ -11,7 +11,7 @@ STA  2000   ; Store at $2000
 ; Hex data
 #DEADBEEF
 
-; More code  
+; More code
 LDA# 00     ; Load 0
 "WORLD"     ; Another string
 #0102       ; More hex data

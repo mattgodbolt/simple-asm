@@ -1,9 +1,10 @@
 ; Minimal 6502 Assembler Source Code
 ; Written in our restricted 4-byte instruction format
-; Assembles programs from $1000 to $2000
+; Reads source from $2000, assembles to $8000
 
+!0000        ; Code assembled to $8000 but runs as if at $0000
 @0200        ; Entry point at $0200
-; Initialize source pointer to $1000
+; Initialize source pointer to $2000
 LDA# 00
 STAZ 00     ; Store to zero page $00
 LDA# 20
@@ -19,6 +20,7 @@ STAZ 03     ; Store to zero page $03
 ; Main assembly loop
 ; Read 4-character opcode into buffer at $05-$08
 MAIN_LOOP:
+LDY# 00     ; Reset Y to 0
 LDAY 00     ; Peek at first character
 CMP# 40     ; Is it '@' ($40)?
 BEQ  05     ; Yes, handle @ directive
@@ -26,20 +28,21 @@ CMP# 23     ; Is it '#' ($23)?
 BEQ  04     ; Yes, handle hex data
 CMP# 22     ; Is it '"' ($22)?
 BEQ  03     ; Yes, handle string data
-JMP  0280   ; $023C: 4C 80 02 EA  - No, handle as opcode (CHAR_HANDLER)
+JMP  0280   ; No, handle as opcode (CHAR_HANDLER)
 
 ; Handle @ directive - jump to handler
-JMP  1200   ; $0240: 4C 00 12 EA  - @ directive handler (HANDLE_AT)
+JMP  1200   ; @ directive handler (HANDLE_AT)
 
 ; Handle # hex data - jump to handler
-JMP  1280   ; $0244: 4C 80 12 EA  - # hex data handler (HANDLE_HASH)
+JMP  1280   ; # hex data handler (HANDLE_HASH)
 
 ; Handle " string data - jump to handler
-JMP  1300   ; $0248: 4C 00 13 EA  - " string data handler (HANDLE_STRING)
+JMP  1300   ; " string data handler (HANDLE_STRING)
 
 @0280       ; Align SKIP_SPACES routine
 ; Skip spaces and newlines then read 4-character opcode
 CHAR_HANDLER:
+LDY# 00     ; Reset Y to 0
 LDAY 00     ; Read current char
 CMP# 20     ; Is it space?
 BEQ  06     ; Yes, advance pointer
@@ -52,14 +55,14 @@ ADC# 01
 STAZ 00
 BCC  F6     ; Loop back to SKIP_SPACES
 INCZ 01
-JMP  0280   ; $0270: 4C 80 02 EA  - Jump back to CHAR_HANDLER
+JMP  0280   ; Jump back to CHAR_HANDLER
 
 ; Read 4 characters into buffer
 READ_OPCODE:
 LDY# 00     ; Initialize index
 READ_CHAR:
 LDAY 00     ; Read from (source),Y
-STAY 0005   ; $027C: 99 05 00 EA  - Store to buffer at $0005,Y
+STAY 0005   ; Store to buffer at $0005,Y
 INY         ; Next character
 CPY# 04     ; Read 4 chars?
 BNE  FB     ; Loop back to read next char
@@ -71,7 +74,7 @@ ADC# 04
 STAZ 00
 BCC  01     ; Skip if no carry
 INCZ 01     ; Increment high byte
-JMP  0300   ; $027C: 4C 00 03 EA  - Jump to table lookup (LOOKUP_TABLE)
+JMP  0300   ; Jump to table lookup (LOOKUP_TABLE)
 
 @0300       ; Align table lookup section with room for expansion
 ; Look up opcode in table at $0500
@@ -86,7 +89,7 @@ TABLE_LOOP:
 LDY# 00     ; Reset comparison index
 COMPARE_CHARS:
 LDAY 0E     ; Get table character
-CMPY 0005   ; $0290: D9 05 00 EA  - Compare with buffer char at $0005,Y
+CMPY 0005   ; Compare with buffer char at $0005,Y
 BNE  0A     ; No match, try next entry
 INY         ; Next character
 CPY# 04     ; All 4 chars checked?
@@ -99,7 +102,13 @@ STAZ 0B     ; Store opcode
 INY         ; Point to type byte
 LDAY 0E     ; Get operand type
 STAZ 0C     ; Store type
-JMP  0400   ; $02BC: 4C 00 04 EA  - Jump to READ_OPERAND
+; Skip space between opcode and operand
+LDY# 00     ; Reset Y to 0
+LDAY 00     ; Get character at source pointer
+CMP# 20     ; Is it a space?
+BNE  02     ; No, skip advance
+JSR  :ADVANCE_SOURCE   ; Yes, advance source pointer
+JMP  0400   ; Jump to READ_OPERAND
 
 ; No match - advance to next table entry
 NEXT_ENTRY:
@@ -129,7 +138,7 @@ CMP# 02     ; Type 2: two bytes
 BNE  04     ; Not 2, must be type 3
 JMP  0540   ; Type 2: jump to READ_WORD
 ; Must be type 3: branch
-JSR  0500   ; $0318: 20 00 05 EA  - Call READ_BYTE
+JSR  :READ_BYTE   ; Call READ_BYTE
 ; Multiply by 4 for branch offset and add 2
 LDAZ 09     ; Get byte value
 ASL         ; Shift left (×2)
@@ -142,7 +151,7 @@ JMP  0E00   ; Jump to WRITE_INST
 @0500       ; Align READ_BYTE routine
 ; Read single byte operand
 READ_BYTE:
-JSR  0580   ; $0340: 20 80 05 EA  - Call hex conversion (HEX_TO_BYTE)
+JSR  :HEX_TO_BYTE   ; Call hex conversion
 STAZ 09     ; Store low byte
 LDA# 00
 STAZ 0A     ; Clear high byte
@@ -151,9 +160,9 @@ JMP  0E00   ; Jump to WRITE_INST
 @0540       ; Align READ_WORD routine
 ; Read two-byte operand (little-endian)
 READ_WORD:
-JSR  0580   ; $0360: 20 80 05 EA  - Call hex conversion
+JSR  :HEX_TO_BYTE   ; Call hex conversion
 STAZ 0A     ; Store as high byte
-JSR  0580   ; $0364: 20 80 05 EA  - Call hex conversion again
+JSR  :HEX_TO_BYTE   ; Call hex conversion again
 STAZ 09     ; Store as low byte
 JMP  0E00   ; Jump to WRITE_INST
 
@@ -161,24 +170,26 @@ JMP  0E00   ; Jump to WRITE_INST
 ; Convert 2 hex digits to byte in A
 ; Advances source pointer by 2
 HEX_TO_BYTE:
+LDY# 00     ; Reset Y to 0
 LDAY 00     ; Get first hex digit
-JSR  05C0   ; $0384: 20 C0 05 EA  - Convert to nibble (HEX_TO_NIBBLE)
+JSR  :HEX_TO_NIBBLE   ; Convert to nibble
 ASL         ; Shift to high nibble
 ASL
 ASL
 ASL
 STAZ 0D     ; Save high nibble
 ; Advance source pointer
-JSR  0600   ; $0390: 20 00 06 EA  - Call ADVANCE_SOURCE
+JSR  :ADVANCE_SOURCE   ; Call ADVANCE_SOURCE
+LDY# 00     ; Reset Y to 0 again
 LDAY 00     ; Get second hex digit
-JSR  05C0   ; $0394: 20 C0 05 EA  - Convert to nibble
+JSR  :HEX_TO_NIBBLE   ; Convert to nibble
 ORAZ 0D     ; Combine with high nibble
 STAZ 04     ; Store complete byte
-JSR  0600   ; $0398: 20 00 06 EA  - Advance source again
+JSR  :ADVANCE_SOURCE   ; Advance source again
 LDAZ 04     ; Return byte in A
 RTS
 
-@05C0       ; Align HEX_NIBBLE routine
+@05E0       ; Align HEX_NIBBLE routine
 ; Convert single hex ASCII char to nibble (0-F)
 ; Input: A = ASCII char, Output: A = nibble
 HEX_TO_NIBBLE:
@@ -271,10 +282,10 @@ CHECK_END:
 LDAZ 0B     ; Get opcode
 CMP# FF     ; Is it END marker?
 BEQ  02     ; Yes, jump to assembled code
-JMP  0220   ; $0448: 4C 20 02 EA - No, continue assembly (MAIN_LOOP)
+JMP  0220   ; No, continue assembly (MAIN_LOOP)
 
 ; Done! Jump to assembled program
-JMP  8000   ; $044C: 4C 00 80 EA - Jump to assembled code at $8000
+JMP  8000   ; Jump to assembled code at $8000
 
 ; Minimal opcode table - just what counter.punch needs
 @1000
@@ -431,9 +442,9 @@ BCC  01
 INCZ 01
 
 ; Read 4 hex digits for address
-JSR  0580   ; $05B8: 20 80 05 EA  - Read first byte (high)
+JSR  :HEX_TO_BYTE   ; Read first byte (high)
 STAZ 06     ; Store high byte
-JSR  0580   ; $05C0: 20 80 05 EA  - Read second byte (low)
+JSR  :HEX_TO_BYTE   ; Read second byte (low)
 STAZ 07     ; Store low byte
 
 ; Calculate target address: $8000 + directive value
@@ -449,7 +460,7 @@ STAZ 0B     ; Store target high byte
 
 ; Fill gap with zeros from current output to target
 ; Current output is at ($02/$03), target at ($0A/$0B)
-JSR  1100   ; Call gap filling routine (SET_OUTPUT_PTR)
+JSR  :SET_OUTPUT_PTR   ; Call gap filling routine
 JMP  0220   ; Back to main loop (MAIN_LOOP)
 
 @1280       ; # hex data handler
@@ -464,7 +475,7 @@ BCC  01
 INCZ 01
 
 ; Read hex byte and write to output
-JSR  0580   ; $05F8: 20 80 05 EA  - Read hex byte
+JSR  :HEX_TO_BYTE   ; Read hex byte
 LDY# 00
 STIY 02     ; Write to (output),Y
 
@@ -475,7 +486,7 @@ ADC# 01
 STAZ 02
 BCC  01
 INCZ 03
-JMP  0220   ; $061C: 4C 20 02 EA  - Back to main loop
+JMP  0220   ; Back to main loop
 
 @1300       ; " string data handler
 ; Handle "text" - read string until closing quote and write to output
@@ -492,6 +503,7 @@ JMP  1320   ; Jump to STRING_LOOP
 @1320       ; Align STRING_LOOP routine
 ; Read characters until closing quote
 STRING_LOOP:
+LDY# 00     ; Reset Y to 0
 LDAY 00     ; Read character
 CMP# 22     ; Is it '"'?
 BEQ  0A     ; Yes, done with string
@@ -501,18 +513,18 @@ LDY# 00
 STIY 02     ; Write to (output),Y
 
 ; Advance both pointers
-JSR  0600   ; $064C: 20 00 06 EA  - Advance source pointer
+JSR  :ADVANCE_SOURCE   ; Advance source pointer
 CLC         ; Advance output pointer
 LDAZ 02
 ADC# 01
 STAZ 02
 BCC  FA     ; Loop back to STRING_LOOP
 INCZ 03
-JMP  1320   ; $0668: 4C 20 13 EA  - Jump back to STRING_LOOP
+JMP  1320   ; Jump back to STRING_LOOP
 
 ; Done with string - advance past closing quote
-JSR  0600   ; $066C: 20 00 06 EA  - Advance source pointer
-JMP  0220   ; $0670: 4C 20 02 EA  - Back to main loop
+JSR  :ADVANCE_SOURCE   ; Advance source pointer
+JMP  0220   ; Back to main loop
 
 ; End of assembler program
 END

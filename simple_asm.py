@@ -108,8 +108,9 @@ class SimpleAssembler:
         self.memory = Memory()
         self.source_ptr = 0x2000  # Source starts at $2000
         self.output_ptr = 0x8000  # Output starts at $8000
-        self.effective_pc = 0  # Effective address (where code thinks it is)
+        self.effective_pc = 0x8000  # Effective address (where code thinks it is)
         self.reloc_offset = 0  # Offset to add to effective address for output
+        self.labels = {}  # Label name -> effective address mapping
 
     def assemble_from_string(self, source: str) -> bytes:
         """Assemble source code from string"""
@@ -119,6 +120,14 @@ class SimpleAssembler:
 
     def assemble(self) -> bytes:
         """Main assembly loop - matches 6502 version exactly"""
+        # First pass: collect labels
+        self._first_pass()
+
+        # Reset for second pass
+        self.source_ptr = 0x2000
+        self.effective_pc = 0x8000
+
+        # Second pass: generate code
         output = []
 
         while True:
@@ -150,14 +159,28 @@ class SimpleAssembler:
                 output.extend(data)
                 self.effective_pc += len(data)
             elif char == "!":
-                # Relocation offset: !1E00
-                offset = self._read_reloc_offset()
-                self.reloc_offset = offset
+                # Relocation directive: !0000 sets effective_pc
+                new_effective_pc = self._read_reloc_directive()
+                self.effective_pc = new_effective_pc
             elif char == "@":
                 # Address directive: @0400
                 target_addr = self._read_address_directive()
                 self._skip_to_address(target_addr, output)
             else:
+                # Check if this is a label definition (ends with :)
+                save_ptr = self.source_ptr
+                word = self._read_word()
+
+                if word.endswith(":"):
+                    # This is a label definition
+                    label_name = word[:-1]  # Remove the colon
+                    self.labels[label_name] = self.effective_pc
+                    self._skip_to_newline()
+                    continue
+                else:
+                    # Not a label, restore pointer and treat as opcode
+                    self.source_ptr = save_ptr
+
                 # Must be an opcode
                 opcode = self._read_opcode()
                 if not opcode or not opcode.strip():
@@ -183,10 +206,10 @@ class SimpleAssembler:
                     operand_low = self._read_hex_byte()
                     operand_high = 0
                 elif operand_type == 2:  # Two bytes (little-endian)
-                    # Read as big-endian, store as little-endian
-                    value = self._read_hex_word()
-                    operand_low = value & 0xFF
-                    operand_high = (value >> 8) & 0xFF
+                    # Check if this is a label reference
+                    operand_value = self._read_operand_value()
+                    operand_low = operand_value & 0xFF
+                    operand_high = (operand_value >> 8) & 0xFF
                 elif operand_type == 3:  # Branch offset
                     offset = self._read_hex_byte()
                     # Convert signed byte to branch offset
@@ -238,16 +261,207 @@ class SimpleAssembler:
 
         return "".join(chars)
 
-    def _skip_to_newline(self) -> None:
-        """Skip characters until we hit a newline"""
+    def _read_word(self) -> str:
+        """Read a word (until whitespace or special character)"""
+        chars = []
         while True:
             byte = self.memory.read_byte(self.source_ptr)
-            if byte == 0:  # End of source
+            if byte == 0:
+                break
+            char = chr(byte)
+            if char in " \t\n\r":
+                break
+            chars.append(char)
+            self.source_ptr += 1
+        return "".join(chars)
+
+    def _skip_to_newline(self):
+        """Skip to the next newline"""
+        while True:
+            byte = self.memory.read_byte(self.source_ptr)
+            if byte == 0:
                 break
             char = chr(byte)
             self.source_ptr += 1
-            if char in "\n\r":
+            if char == "\n":
                 break
+
+    def _read_operand_value(self) -> int:
+        """Read an operand value - either hex digits or :LABEL reference"""
+        self._skip_spaces()
+
+        # Check if it's a label reference
+        if self.memory.read_byte(self.source_ptr) == ord(":"):
+            self.source_ptr += 1  # Skip the ':'
+            label_name = self._read_word()
+            if label_name not in self.labels:
+                raise ValueError(f"Unknown label: {label_name}")
+            # Labels contain effective addresses
+            return self.labels[label_name]
+        else:
+            # Regular hex value
+            return self._read_hex_word()
+
+    def _first_pass(self):
+        """First pass: collect all labels"""
+        save_source_ptr = self.source_ptr
+        save_effective_pc = self.effective_pc
+
+        self.source_ptr = 0x2000
+        self.effective_pc = 0x8000
+
+        while True:
+            # Skip spaces and tabs (but not newlines)
+            self._skip_spaces()
+
+            # Peek at first character
+            byte = self.memory.read_byte(self.source_ptr)
+            if byte == 0:  # End of source
+                break
+
+            char = chr(byte)
+
+            if char == "\n":
+                # Newline - just skip it
+                self.source_ptr += 1
+            elif char == ";":
+                # Comment - skip to end of line
+                self._skip_to_newline()
+            elif char == '"':
+                # String data - skip
+                data_len = self._measure_string()
+                self.effective_pc += data_len
+            elif char == "#":
+                # Hex data - skip
+                data_len = self._measure_hex_data()
+                self.effective_pc += data_len
+            elif char == "!":
+                # Relocation directive: !0000 sets effective_pc
+                new_effective_pc = self._read_reloc_directive()
+                self.effective_pc = new_effective_pc
+            elif char == "@":
+                # Address directive
+                target_addr = self._read_address_directive()
+                self._skip_to_address_in_first_pass(target_addr)
+            else:
+                # Check if this is a label definition (ends with :)
+                save_ptr = self.source_ptr
+                word = self._read_word()
+
+                if word.endswith(":"):
+                    # This is a label definition
+                    label_name = word[:-1]  # Remove the colon
+                    self.labels[label_name] = self.effective_pc
+                    self._skip_to_newline()
+                    continue
+                else:
+                    # Not a label, restore pointer and treat as opcode
+                    self.source_ptr = save_ptr
+
+                # Must be an opcode - skip it and advance effective PC
+                opcode = self._read_opcode()
+                if not opcode or not opcode.strip():
+                    break
+
+                # Skip spaces after opcode
+                self._skip_spaces()
+
+                # Look up in opcode table
+                if opcode not in self.OPCODES:
+                    raise ValueError(f"Unknown opcode: '{opcode}'")
+
+                opcode_byte, operand_type = self.OPCODES[opcode]
+
+                # Handle END marker
+                if opcode == "END ":
+                    break
+
+                # Skip operand reading in first pass
+                self._skip_operand(operand_type)
+
+                # Each instruction is 4 bytes
+                self.effective_pc += 4
+
+        # Restore original state
+        self.source_ptr = save_source_ptr
+        self.effective_pc = save_effective_pc
+
+    def _measure_string(self) -> int:
+        """Measure length of string without processing"""
+        self.source_ptr += 1  # Skip opening quote
+        count = 0
+        while True:
+            byte = self.memory.read_byte(self.source_ptr)
+            if byte == 0 or chr(byte) == '"':
+                break
+            count += 1
+            self.source_ptr += 1
+        if self.memory.read_byte(self.source_ptr) == ord('"'):
+            self.source_ptr += 1  # Skip closing quote
+        return count
+
+    def _measure_hex_data(self) -> int:
+        """Measure length of hex data without processing"""
+        self.source_ptr += 1  # Skip '#'
+
+        hex_chars = 0
+        while True:
+            byte = self.memory.read_byte(self.source_ptr)
+            if byte == 0:
+                break
+            char = chr(byte)
+            if char in "0123456789ABCDEFabcdef":
+                hex_chars += 1
+                self.source_ptr += 1
+            else:
+                break
+
+        # Each pair of hex chars = 1 byte
+        return (hex_chars + 1) // 2
+
+    def _skip_to_address_in_first_pass(self, target_addr: int):
+        """Skip to address in first pass"""
+        # Fill with zeros to target address
+        gap_size = target_addr - self.effective_pc
+        if gap_size > 0:
+            self.effective_pc = target_addr
+
+    def _skip_operand(self, operand_type: int):
+        """Skip operand reading in first pass"""
+        if operand_type == 0:  # No operand
+            pass
+        elif operand_type == 1:  # Single byte
+            self._skip_hex_byte()
+        elif operand_type == 2:  # Two bytes
+            self._skip_operand_value()
+        elif operand_type == 3:  # Branch offset
+            self._skip_hex_byte()
+
+    def _skip_hex_byte(self):
+        """Skip hex byte reading"""
+        self._skip_spaces()
+        for _ in range(2):  # Skip 2 hex digits
+            byte = self.memory.read_byte(self.source_ptr)
+            if byte == 0:
+                break
+            char = chr(byte)
+            if char in "0123456789ABCDEFabcdef":
+                self.source_ptr += 1
+
+    def _skip_operand_value(self):
+        """Skip operand value (hex or label)"""
+        self._skip_spaces()
+        if self.memory.read_byte(self.source_ptr) == ord(":"):
+            self.source_ptr += 1  # Skip ':'
+            self._read_word()  # Skip label name
+        else:
+            for _ in range(4):  # Skip 4 hex digits
+                byte = self.memory.read_byte(self.source_ptr)
+                if byte == 0:
+                    break
+                char = chr(byte)
+                if char in "0123456789ABCDEFabcdef":
+                    self.source_ptr += 1
 
     def _skip_spaces(self) -> None:
         """Skip spaces and tabs only (not newlines)"""
@@ -351,8 +565,8 @@ class SimpleAssembler:
         self._skip_to_newline()
         return data
 
-    def _read_reloc_offset(self) -> int:
-        """Read relocation offset: !1E00 and return as integer"""
+    def _read_reloc_directive(self) -> int:
+        """Read relocation directive: !0000 and return as integer"""
         # Skip ! character
         self.source_ptr += 1
 
