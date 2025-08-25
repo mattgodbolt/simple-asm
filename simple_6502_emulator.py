@@ -38,6 +38,7 @@ class CPU6502:
 
         # Debug settings
         self.trace = False
+        self.quiet = False
         self.cycle_count = 0
 
         # Opcode dispatch table
@@ -690,37 +691,68 @@ class CPU6502:
         else:
             return f"??? ${opcode:02X}"
 
-    def run(self, start_pc: int, max_cycles: int = 1000000, trap_addresses: list[int] | None = None):
+    def run(
+        self,
+        start_pc: int,
+        max_cycles: int = 1000000,
+        trap_addresses: list[int] | None = None,
+        trace_from: int | None = None,
+        trace_to: int | None = None,
+        trace_pc_addrs: set[int] | None = None,
+        watch_addrs: set[int] | None = None,
+        watch_memory: dict[int, int] | None = None,
+        breakpoint_addrs: set[int] | None = None,
+    ):
         """Main execution loop"""
         self.pc = start_pc
         self.cycle_count = 0
         trap_addresses = trap_addresses or []
+        trace_pc_addrs = trace_pc_addrs or set()
+        watch_addrs = watch_addrs or set()
+        watch_memory = watch_memory or {}
+        breakpoint_addrs = breakpoint_addrs or set()
 
-        if self.trace:
+        if self.trace and not self.quiet:
             print(f"Starting execution at ${start_pc:04X}")
             self.print_registers()
 
         try:
             while self.cycle_count < max_cycles:
+                # Check for breakpoints (pause for user input)
+                if self.pc in breakpoint_addrs:
+                    print(f"\n*** BREAKPOINT at ${self.pc:04X} after {self.cycle_count} cycles ***")
+                    self.print_registers()
+                    input("Press Enter to continue...")
+
                 # Check for trap addresses
                 if self.pc in trap_addresses:
-                    print(f"\n*** TRAP at ${self.pc:04X} after {self.cycle_count} cycles ***")
-                    self.print_registers()
+                    if not self.quiet:
+                        print(f"\n*** TRAP at ${self.pc:04X} after {self.cycle_count} cycles ***")
+                        self.print_registers()
                     return "TRAP"
 
                 # Fetch instruction
                 instruction_pc = self.pc
                 opcode = self.read_pc_byte()
 
+                # Check if we should trace this instruction
+                should_trace = (
+                    self.trace
+                    and (trace_from is None or self.cycle_count >= trace_from)
+                    and (trace_to is None or self.cycle_count <= trace_to)
+                    and (not trace_pc_addrs or instruction_pc in trace_pc_addrs)
+                )
+
                 # Trace before execution
-                if self.trace:
+                if should_trace:
                     disasm = self.disassemble_opcode(instruction_pc)
                     print(f"${instruction_pc:04X}: {opcode:02X} {disasm}")
 
                 # Check for BRK
                 if opcode == 0x00:
-                    print(f"\n*** BRK at ${instruction_pc:04X} after {self.cycle_count} cycles ***")
-                    self.print_registers()
+                    if not self.quiet:
+                        print(f"\n*** BRK at ${instruction_pc:04X} after {self.cycle_count} cycles ***")
+                        self.print_registers()
                     return "BRK"
 
                 # Dispatch to instruction handler
@@ -730,20 +762,33 @@ class CPU6502:
                 self.opcodes[opcode]()
                 self.cycle_count += 1
 
+                # Check for memory watch changes
+                if watch_addrs:
+                    for addr in watch_addrs:
+                        old_val = watch_memory.get(addr, 0)
+                        new_val = self.memory[addr]
+                        if old_val != new_val:
+                            print(
+                                f"WATCH: ${addr:04X} changed from ${old_val:02X} to ${new_val:02X} at cycle {self.cycle_count}"
+                            )
+                            watch_memory[addr] = new_val
+
                 # Trace after execution
-                if self.trace:
+                if should_trace:
                     self.print_registers()
                     print()
 
         except KeyboardInterrupt:
-            print(f"\n*** INTERRUPTED at ${self.pc:04X} after {self.cycle_count} cycles ***")
+            if not self.quiet:
+                print(f"\n*** INTERRUPTED at ${self.pc:04X} after {self.cycle_count} cycles ***")
             return "INTERRUPT"
         except Exception as e:
             print(f"\n*** ERROR at ${self.pc:04X} after {self.cycle_count} cycles: {e} ***")
             self.print_registers()
             raise
 
-        print(f"\n*** MAX CYCLES REACHED ({max_cycles}) ***")
+        if not self.quiet:
+            print(f"\n*** MAX CYCLES REACHED ({max_cycles}) ***")
         return "MAX_CYCLES"
 
 
@@ -754,10 +799,30 @@ class CPU6502:
     "--trap", "trap_specs", multiple=True, help="Trap addresses in hex (execution stops when PC reaches these)"
 )
 @click.option("--trace", is_flag=True, help="Enable instruction trace output")
+@click.option("--trace-from", type=int, help="Start tracing from this cycle number")
+@click.option("--trace-to", type=int, help="Stop tracing at this cycle number")
+@click.option("--trace-pc", "trace_pc_specs", multiple=True, help="Only trace when PC is at these addresses (hex)")
+@click.option("--quiet", is_flag=True, help="Suppress non-error output except final result")
+@click.option("--watch", "watch_specs", multiple=True, help="Watch memory locations for changes (hex address)")
+@click.option("--breakpoint", "breakpoint_specs", multiple=True, help="Pause at specific PC values (hex)")
 @click.option("--max-cycles", type=int, default=1000000, help="Maximum cycles to execute (default: 1000000)")
 @click.option("--dump", type=str, help="Dump memory range after execution (format: start:end or start:end:filename)")
 @click.option("--compare", type=str, help="Compare memory dump with file (format: start:end:filename)")
-def main(load_specs, start, trap_specs, trace, max_cycles, dump, compare):
+def main(
+    load_specs,
+    start,
+    trap_specs,
+    trace,
+    trace_from,
+    trace_to,
+    trace_pc_specs,
+    quiet,
+    watch_specs,
+    breakpoint_specs,
+    max_cycles,
+    dump,
+    compare,
+):
     """
     Minimal 6502 emulator for testing assembler bootstrap.
 
@@ -779,6 +844,34 @@ def main(load_specs, start, trap_specs, trace, max_cycles, dump, compare):
 
     cpu = CPU6502()
     cpu.trace = trace
+    cpu.quiet = quiet
+
+    # Parse trace PC specs
+    trace_pc_addrs = set()
+    for pc_spec in trace_pc_specs:
+        try:
+            trace_pc_addrs.add(int(pc_spec, 16))
+        except ValueError:
+            click.echo(f"Error: Invalid hex PC address '{pc_spec}'", err=True)
+            sys.exit(1)
+
+    # Parse watch specs
+    watch_addrs = set()
+    for watch_spec in watch_specs:
+        try:
+            watch_addrs.add(int(watch_spec, 16))
+        except ValueError:
+            click.echo(f"Error: Invalid hex watch address '{watch_spec}'", err=True)
+            sys.exit(1)
+
+    # Parse breakpoint specs
+    breakpoint_addrs = set()
+    for bp_spec in breakpoint_specs:
+        try:
+            breakpoint_addrs.add(int(bp_spec, 16))
+        except ValueError:
+            click.echo(f"Error: Invalid hex breakpoint address '{bp_spec}'", err=True)
+            sys.exit(1)
 
     # Load files into memory
     for spec in load_specs:
@@ -795,7 +888,7 @@ def main(load_specs, start, trap_specs, trace, max_cycles, dump, compare):
 
         try:
             cpu.load_file(filename, address)
-            if not trace:
+            if not quiet:
                 click.echo(f"Loaded {filename} at ${address:04X}")
         except Exception as e:
             click.echo(f"Error loading {filename}: {e}", err=True)
@@ -821,8 +914,23 @@ def main(load_specs, start, trap_specs, trace, max_cycles, dump, compare):
         sys.exit(1)
 
     # Run the emulation
-    click.echo(f"Starting execution at ${start_pc:04X}")
-    result = cpu.run(start_pc, max_cycles, trap_addresses)
+    if not quiet:
+        click.echo(f"Starting execution at ${start_pc:04X}")
+
+    # Create watch memory snapshot if watching
+    watch_memory = {addr: cpu.memory[addr] for addr in watch_addrs}
+
+    result = cpu.run(
+        start_pc,
+        max_cycles,
+        trap_addresses,
+        trace_from,
+        trace_to,
+        trace_pc_addrs,
+        watch_addrs,
+        watch_memory,
+        breakpoint_addrs,
+    )
 
     # Handle memory dump
     if dump:

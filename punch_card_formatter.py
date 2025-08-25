@@ -49,6 +49,7 @@ def parse_line(line: str) -> tuple | None:
 
     Returns:
         None for blank lines or comments
+        ("LABEL", label_name) for labels ending with :
         (opcode, operand) tuple for instructions
     """
     # Strip whitespace
@@ -62,6 +63,13 @@ def parse_line(line: str) -> tuple | None:
     if line.startswith(";"):
         return None
 
+    # Handle labels (ends with :)
+    if line.endswith(":"):
+        label_name = line[:-1].strip()
+        if not label_name:
+            raise ValueError("Empty label name")
+        return ("LABEL", label_name)
+
     # Handle data lines and directives, but strip comments from them
     if line.startswith('"') or line.startswith("#") or line.startswith("!") or line.startswith("@"):
         # For string literals, only strip comments AFTER the closing quote
@@ -70,14 +78,14 @@ def parse_line(line: str) -> tuple | None:
             closing_quote = line.find('"', 1)
             if closing_quote != -1:
                 # Check for comment after the closing quote
-                after_quote = line[closing_quote + 1:]
+                after_quote = line[closing_quote + 1 :]
                 if ";" in after_quote:
-                    line = line[:closing_quote + 1 + after_quote.index(";")].strip()
+                    line = line[: closing_quote + 1 + after_quote.index(";")].strip()
         else:
             # For other directives (@, #, !), strip any comments
             if ";" in line:
                 line = line[: line.index(";")].strip()
-        
+
         if not line:
             return None
         return ("DATA", line)
@@ -98,7 +106,7 @@ def parse_line(line: str) -> tuple | None:
     elif len(parts) == 2:
         # Opcode and operand
         opcode = normalize_opcode(parts[0])
-        operand = normalize_operand(parts[1])
+        operand = parts[1]  # Don't normalize yet, might be a label
         return (opcode, operand)
     else:
         # Should never happen due to split(None, 1)
@@ -115,15 +123,85 @@ def format_instruction(opcode: str, operand: str) -> str:
         return opcode
 
 
+def resolve_branch_offset(from_instruction: int, to_instruction: int) -> str:
+    """Convert instruction index difference to branch offset hex"""
+    offset = to_instruction - from_instruction - 1  # -1 because branch is relative to next instruction
+
+    # Convert to hex offset for our 4-byte instruction format
+    if offset >= 0:
+        # Forward branch: convert to hex
+        if offset > 127:  # Max forward branch in 6502
+            raise ValueError(f"Forward branch too far: {offset} instructions")
+        return f"{offset:02X}"
+    else:
+        # Backward branch: convert to two's complement
+        if offset < -128:  # Max backward branch in 6502
+            raise ValueError(f"Backward branch too far: {offset} instructions")
+        hex_offset = (256 + offset) & 0xFF
+        return f"{hex_offset:02X}"
+
+
 def convert_to_punch_format(source_lines: list[str]) -> list[str]:
-    """Convert friendly source to punch card format"""
-    punch_instructions = []
+    """Convert friendly source to punch card format with label resolution"""
+    # First pass: parse all lines and collect labels
+    parsed_lines = []
+    labels = {}  # label_name -> instruction_index
 
     for line_no, line in enumerate(source_lines, 1):
         try:
             parsed = parse_line(line)
             if parsed is not None:
                 opcode, operand = parsed
+                if opcode == "LABEL":
+                    # Record label position (next instruction index)
+                    labels[operand] = len(parsed_lines)
+                else:
+                    # Regular instruction
+                    parsed_lines.append((opcode, operand, line_no))
+        except ValueError as e:
+            raise ValueError(f"Line {line_no}: {e}") from e
+
+    # Second pass: resolve branches and format instructions
+    punch_instructions = []
+    branch_ops = {"BEQ ", "BNE ", "BCC ", "BCS ", "BMI ", "BPL ", "BVC ", "BVS "}
+
+    for inst_index, (opcode, operand, line_no) in enumerate(parsed_lines):
+        try:
+            if opcode == "DATA":
+                # Data lines pass through unchanged
+                punch_instructions.append(operand)
+            elif opcode in branch_ops and operand.startswith(":"):
+                # Resolve branch to label (operand has : prefix)
+                label_name = operand[1:]  # Strip : prefix
+                if label_name not in labels:
+                    raise ValueError(f"Undefined label: {label_name}")
+                target_index = labels[label_name]
+                offset = resolve_branch_offset(inst_index, target_index)
+                instruction = format_instruction(opcode, offset)
+                punch_instructions.append(instruction)
+            elif opcode in branch_ops:
+                # Regular branch with hex operand
+                operand = normalize_operand(operand)
+                instruction = format_instruction(opcode, operand)
+                punch_instructions.append(instruction)
+            elif opcode.strip() in {"JMP", "JSR"} and operand.startswith(":"):
+                # Resolve JMP/JSR to label (operand has : prefix)
+                label_name = operand[1:]  # Strip : prefix
+                if label_name not in labels:
+                    raise ValueError(f"Undefined label: {label_name}")
+                # For absolute labels, we need to convert instruction index to address
+                # For now, keep original operand since assembler uses hardcoded addresses
+                instruction = format_instruction(opcode, operand)
+                punch_instructions.append(instruction)
+            elif opcode.strip() in {"JMP", "JSR"}:
+                # Regular JMP/JSR with address operand
+                operand = normalize_operand(operand)
+                instruction = format_instruction(opcode, operand)
+                punch_instructions.append(instruction)
+            else:
+                # Regular instruction - normalize operand if it's not a label reference
+                if operand and not operand.startswith(":"):
+                    operand = normalize_operand(operand)
                 instruction = format_instruction(opcode, operand)
                 punch_instructions.append(instruction)
         except ValueError as e:
