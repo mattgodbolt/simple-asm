@@ -123,6 +123,24 @@ clean: clean-outputs  ## Clean generated files (not dependencies)
 clean-all:  ## Clean everything including uv environment
 	rm -rf $(UV_VENV) *.bin bootstrap-output.bin
 
+# Test punch format consistency
+.PHONY: test-punch-consistency
+test-punch-consistency: env  ## Test that .asm and .punch formats produce identical output
+	@echo "Testing punch format consistency..."
+	# Assemble directly from .asm
+	$(UV_BIN) run python simple_asm.py assembler_source.asm
+	mv assembler_source.bin assembler_source_direct.bin
+	# Convert to punch format and assemble
+	$(UV_BIN) run python punch_card_formatter.py assembler_source.asm assembler_source.punch
+	$(UV_BIN) run python simple_asm.py assembler_source.punch
+	mv assembler_source.bin assembler_source_punch.bin
+	# Compare the outputs
+	@echo "Comparing outputs..."
+	diff assembler_source_direct.bin assembler_source_punch.bin
+	@echo "SUCCESS: Both assembly paths produce identical output"
+	# Cleanup
+	rm -f assembler_source_direct.bin assembler_source_punch.bin
+
 # Default target
 .PHONY: all
 all: format-examples assemble-examples test-emulator  ## Build and test everything

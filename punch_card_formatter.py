@@ -143,9 +143,10 @@ def resolve_branch_offset(from_instruction: int, to_instruction: int) -> str:
 
 def convert_to_punch_format(source_lines: list[str]) -> list[str]:
     """Convert friendly source to punch card format with label resolution"""
-    # First pass: parse all lines and collect labels
+    # First pass: parse all lines and collect labels with their effective addresses
     parsed_lines: list[tuple[str, str, int]] = []
-    labels = {}  # label_name -> instruction_index
+    labels = {}  # label_name -> effective_address
+    effective_address = 0  # Track current effective address
 
     for line_no, line in enumerate(source_lines, 1):
         try:
@@ -153,11 +154,19 @@ def convert_to_punch_format(source_lines: list[str]) -> list[str]:
             if parsed is not None:
                 opcode, operand = parsed
                 if opcode == "LABEL":
-                    # Record label position (next instruction index)
-                    labels[operand] = len(parsed_lines)
-                else:
-                    # Regular instruction
+                    # Record label position at current effective address
+                    labels[operand] = effective_address
+                elif opcode == "DATA" and operand.startswith("@"):
+                    # Address directive - update effective address
+                    hex_part = operand[1:]  # Remove @
+                    effective_address = int(hex_part, 16)
                     parsed_lines.append((opcode, operand, line_no))
+                else:
+                    # Regular instruction or other directive
+                    parsed_lines.append((opcode, operand, line_no))
+                    # Advance effective address for instructions (not directives)
+                    if opcode not in ["DATA"]:  # DATA includes !, @, #, " directives
+                        effective_address += 4
         except ValueError as e:
             raise ValueError(f"Line {line_no}: {e}") from e
 
@@ -189,9 +198,10 @@ def convert_to_punch_format(source_lines: list[str]) -> list[str]:
                 label_name = operand[1:]  # Strip : prefix
                 if label_name not in labels:
                     raise ValueError(f"Undefined label: {label_name}")
-                # For absolute labels, we need to convert instruction index to address
-                # For now, keep original operand since assembler uses hardcoded addresses
-                instruction = format_instruction(opcode, operand)
+                # Convert label address to 4-digit hex
+                address = labels[label_name]
+                hex_address = f"{address:04X}"
+                instruction = format_instruction(opcode, hex_address)
                 punch_instructions.append(instruction)
             elif opcode.strip() in {"JMP", "JSR"}:
                 # Regular JMP/JSR with address operand

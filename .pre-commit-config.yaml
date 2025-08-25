@@ -32,3 +32,10 @@ repos:
         types_or: [python]
         pass_filenames: false
         require_serial: true
+      - id: test-punch-consistency
+        name: Test punch format consistency
+        entry: make test-punch-consistency
+        language: system
+        types_or: [python]
+        pass_filenames: false
+        require_serial: true
