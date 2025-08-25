@@ -38,17 +38,19 @@ JMP  1280   ; $0244: 4C 80 12 EA  - # hex data handler
 JMP  1300   ; $0248: 4C 00 13 EA  - " string data handler
 
 @0280       ; Align SKIP_SPACES routine
-; Skip spaces then read 4-character opcode
+; Skip spaces and newlines then read 4-character opcode
 ; SKIP_SPACES:
 LDAY 00     ; Read current char
 CMP# 20     ; Is it space?
-BNE  10     ; No, start reading opcode
+BEQ  06     ; Yes, advance pointer
+CMP# 0A     ; Is it newline?
+BNE  0E     ; No, start reading opcode
 ; Advance source pointer by 1
 CLC         
 LDAZ 00     
 ADC# 01     
 STAZ 00     
-BCC  FA     ; Loop back to SKIP_SPACES
+BCC  F7     ; Loop back to SKIP_SPACES
 INCZ 01     
 JMP  0280   ; $0270: 4C 80 02 EA  - Jump back to SKIP_SPACES
 
@@ -59,7 +61,7 @@ LDAY 00     ; Read from (source),Y
 STAY 0005   ; $027C: 99 05 00 EA  - Store to buffer at $0005,Y
 INY         ; Next character
 CPY# 04     ; Read 4 chars?
-BNE  FB     ; Loop back to read next char
+BNE  F9     ; Loop back to read next char
 
 ; Advance source pointer by 4
 CLC         
@@ -87,7 +89,7 @@ CMPY 0005   ; $0290: D9 05 00 EA  - Compare with buffer char at $0005,Y
 BNE  0A     ; No match, try next entry
 INY         ; Next character
 CPY# 04     ; All 4 chars checked?
-BNE  FC     ; Loop back to COMPARE_CHARS
+BNE  FB     ; Loop back to COMPARE_CHARS
 
 ; Found match! Extract opcode and type
 LDY# 04     ; Point to opcode byte
@@ -117,11 +119,14 @@ BRK         ; Error - opcode not found
 ; Read operand based on type in $0C
 ; READ_OPERAND:
 LDAZ 0C     ; Get operand type
-BEQ  1E     ; Type 0: no operand, goto WRITE_INST
+BEQ  02     ; Type 0: no operand, goto WRITE_INST
+JMP  0E00   ; Jump to WRITE_INST
 CMP# 01     ; Type 1: single byte
-BEQ  04     ; Yes, goto READ_BYTE
+BEQ  02     ; Yes, goto READ_BYTE
+JMP  0500   ; Jump to READ_BYTE
 CMP# 02     ; Type 2: two bytes
-BEQ  08     ; Yes, goto READ_WORD
+BEQ  02     ; Yes, goto READ_WORD  
+JMP  0540   ; Jump to read_WORD
 ; Must be type 3: branch
 JSR  0500   ; $0318: 20 00 05 EA  - Call READ_BYTE
 ; Multiply by 4 for branch offset and add 2
@@ -131,7 +136,7 @@ ASL         ; Shift left (×4)
 CLC         ; Clear carry
 ADC# 02     ; Add 2 to compensate for PC offset
 STAZ 09     ; Store result
-JMP  0640   ; $0334: 4C 40 06 EA  - Jump to WRITE_INST
+JMP  0E00   ; Jump to WRITE_INST
 
 @0500       ; Align READ_BYTE routine
 ; Read single byte operand
@@ -140,7 +145,7 @@ JSR  0580   ; $0340: 20 80 05 EA  - Call hex conversion
 STAZ 09     ; Store low byte
 LDA# 00     
 STAZ 0A     ; Clear high byte
-JMP  0640   ; $034C: 4C 40 06 EA  - Jump to WRITE_INST
+JMP  0E00   ; Jump to WRITE_INST
 
 @0540       ; Align READ_WORD routine
 ; Read two-byte operand (little-endian)
@@ -149,7 +154,7 @@ JSR  0580   ; $0360: 20 80 05 EA  - Call hex conversion
 STAZ 0A     ; Store as high byte
 JSR  0580   ; $0364: 20 80 05 EA  - Call hex conversion again
 STAZ 09     ; Store as low byte
-JMP  0640   ; $0370: 4C 40 06 EA  - Jump to WRITE_INST
+JMP  0E00   ; Jump to WRITE_INST
 
 @0580       ; Align HEX_TO_BYTE routine
 ; Convert 2 hex digits to byte in A
@@ -177,7 +182,7 @@ RTS
 ; Input: A = ASCII char, Output: A = nibble
 ; HEX_CHAR_TO_NIBBLE:
 CMP# 41     ; Is it >= 'A'?
-BCS  04     ; Yes, handle A-F
+BCS  02     ; Yes, handle A-F
 SBC# 2F     ; Convert '0'-'9' (subtract '0'-1)
 RTS         
 SBC# 36     ; Convert 'A'-'F' (subtract 'A'-10-1)
@@ -194,7 +199,7 @@ BCC  01     ; Skip if no carry
 INCZ 01     ; Increment high byte
 RTS         
 
-@0640       ; Align WRITE_INST routine
+@0E00       ; Align WRITE_INST routine
 ; Write instruction to output
 ; WRITE_INST:
 LDY# 00     ; Initialize output index
@@ -204,7 +209,8 @@ INY         ; Next position
 
 ; Write operand bytes or NOPs based on type
 LDAZ 0C     ; Get operand type
-BEQ  0A     ; Type 0: write 3 NOPs
+BEQ  02     ; Type 0: write 3 NOPs
+JMP  0F40   ; Jump to type 0 handler
 CMP# 01     ; Type 1: write byte + 2 NOPs
 BEQ  06     ; Yes, goto WRITE_BYTE
 ; Type 2 or 3: write 2 bytes + 1 NOP
@@ -214,7 +220,7 @@ INY         ; Next position
 LDAZ 0A     ; Get high byte
 STIY 02     ; Write it
 INY         ; Next position
-JMP  0700   ; $0440: 4C 00 07 EA  - Jump to write final NOP
+JMP  0F00   ; Jump to write final NOP
 
 ; WRITE_BYTE:
 LDAZ 09     ; Get operand byte
@@ -223,8 +229,9 @@ INY         ; Next position
 LDA# EA     ; NOP opcode
 STIY 02     ; Write NOP
 INY         ; Next position
+JMP  0F00   ; Jump to write final NOP
 
-@0700       ; Align final NOP writing section
+@0F00       ; Align final NOP writing section
 ; WRITE_NOPS:
 LDA# EA     ; NOP opcode
 STIY 02     ; Write final NOP
@@ -235,8 +242,29 @@ ADC# 04     ; Add 4
 STAZ 02     
 BCC  01     ; Skip if no carry
 INCZ 03     ; Increment high byte
+JMP  0F80   ; Jump to end check
 
-@0740       ; Align end check section
+@0F40       ; Type 0 handler: write 3 NOPs
+; WRITE_3_NOPS:
+LDA# EA     ; NOP opcode
+STIY 02     ; Write first NOP
+INY         ; Next position
+LDA# EA     ; NOP opcode
+STIY 02     ; Write second NOP  
+INY         ; Next position
+LDA# EA     ; NOP opcode
+STIY 02     ; Write third NOP
+INY         ; Next position
+; Advance output pointer by 4
+CLC         
+LDAZ 02     ; Output pointer low
+ADC# 04     ; Add 4
+STAZ 02     
+BCC  01     ; Skip if no carry
+INCZ 03     ; Increment high byte
+JMP  0F80   ; Jump to end check
+
+@0F80       ; Align end check section
 ; Check for END marker (special opcode $FF)
 LDAZ 0B     ; Get opcode
 CMP# FF     ; Is it END marker?
@@ -380,6 +408,14 @@ JMP  2000   ; $044C: 4C 00 20 EA
 #E9
 #01
 
+@1100       ; Gap filling routine - simplified approach
+; Just copy target address to output pointer (skip actual filling for now)
+LDAZ 0A     ; Target low
+STAZ 02     ; Set output pointer low  
+LDAZ 0B     ; Target high
+STAZ 03     ; Set output pointer high
+RTS         ; Return
+
 @1200       ; @ directive handler
 ; Handle @xxxx - set effective address and fill gap
 ; Advance source pointer by 1 (skip '@')
@@ -396,11 +432,21 @@ STAZ 0D     ; Store high byte
 JSR  0580   ; $05C0: 20 80 05 EA  - Read second byte (low) 
 STAZ 04     ; Store low byte
 
-; Calculate gap to fill (target - current output)
-; Target address is in $0D (high) and $04 (low)
-; Current output pointer is in $02/$03
-; For now, just skip to next instruction (no gap filling yet)
-JMP  0220   ; $05C8: 4C 20 02 EA  - Back to main loop
+; Calculate target address: $8000 + directive value
+; Directive value is in $0D (high) and $04 (low)
+; Target = $8000 + ($0D << 8) + $04
+CLC
+LDAZ 04     ; Get low byte of directive
+ADC# 00     ; Add base address low ($8000 & $FF = $00)
+STAZ 0A     ; Store target low byte
+LDAZ 0D     ; Get high byte of directive
+ADC# 80     ; Add base address high ($8000 >> 8 = $80)  
+STAZ 0B     ; Store target high byte
+
+; Fill gap with zeros from current output to target
+; Current output is at ($02/$03), target at ($0A/$0B)
+JSR  1100   ; Call gap filling routine
+JMP  0220   ; Back to main loop
 
 @1280       ; # hex data handler  
 ; Handle #xx - read hex byte and write to output
@@ -435,6 +481,7 @@ ADC# 01
 STAZ 00     
 BCC  01     
 INCZ 01     
+JMP  1320   ; Jump to STRING_LOOP
 
 @1320       ; Align STRING_LOOP routine
 ; Read characters until closing quote
@@ -460,3 +507,6 @@ JMP  1320   ; $0668: 4C 20 13 EA  - Jump back to STRING_LOOP
 ; Done with string - advance past closing quote
 JSR  0600   ; $066C: 20 00 06 EA  - Advance source pointer
 JMP  0220   ; $0670: 4C 20 02 EA  - Back to main loop
+
+; End of assembler program
+END 

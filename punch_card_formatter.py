@@ -62,8 +62,24 @@ def parse_line(line: str) -> tuple | None:
     if line.startswith(";"):
         return None
 
-    # Pass through data lines and directives unchanged
+    # Handle data lines and directives, but strip comments from them
     if line.startswith('"') or line.startswith("#") or line.startswith("!") or line.startswith("@"):
+        # For string literals, only strip comments AFTER the closing quote
+        if line.startswith('"'):
+            # Find the closing quote
+            closing_quote = line.find('"', 1)
+            if closing_quote != -1:
+                # Check for comment after the closing quote
+                after_quote = line[closing_quote + 1:]
+                if ";" in after_quote:
+                    line = line[:closing_quote + 1 + after_quote.index(";")].strip()
+        else:
+            # For other directives (@, #, !), strip any comments
+            if ";" in line:
+                line = line[: line.index(";")].strip()
+        
+        if not line:
+            return None
         return ("DATA", line)
 
     # Remove inline comments
