@@ -881,7 +881,9 @@ def main(load_specs, start, trap_specs, trace, max_cycles, dump, compare):
             for i, (expected_byte, actual_byte) in enumerate(zip(expected, emulated, strict=False)):
                 if expected_byte != actual_byte:
                     addr = cmp_start + i
-                    click.echo(f"  First difference at ${addr:04X}: expected ${expected_byte:02X}, got ${actual_byte:02X}")
+                    click.echo(
+                        f"  First difference at ${addr:04X}: expected ${expected_byte:02X}, got ${actual_byte:02X}"
+                    )
                     break
 
             # Show length difference if any

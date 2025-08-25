@@ -54,20 +54,24 @@ run-friendly: env assemble-friendly  ## Run friendly program in emulator with tr
 test-emulator: run-counter  ## Basic emulator functionality test
 
 # Bootstrap testing targets
+.PHONY: format-assembler
+format-assembler: env  ## Convert assembler source to punch format
+	$(UV_BIN) run python punch_card_formatter.py assembler_source.asm assembler_source.punch
+
 .PHONY: assemble-assembler
 assemble-assembler: env  ## Assemble the 6502 assembler itself
 	$(UV_BIN) run python simple_asm.py assembler_source.asm
 
 .PHONY: test-bootstrap
-test-bootstrap: env assemble-assembler format-counter  ## Test assembler bootstrapping
+test-bootstrap: env assemble-assembler format-assembler  ## Test assembler bootstrapping
 	@echo "Testing assembler self-assembly..."
 	$(UV_BIN) run python simple_6502_emulator.py \
 		--load assembler_source.bin@0000 \
-		--load counter.punch@1000 \
+		--load assembler_source.punch@2000 \
 		--start 0200 \
-		--trap 1000 \
-		--dump 2000:2FFF:bootstrap-output.bin \
-		--compare 2000:2FFF:counter.punch
+		--trap 8000 \
+		--dump 8000:CFFF:bootstrap-output.bin \
+		--compare 8000:CFFF:assembler_source.bin
 
 # Development targets
 .PHONY: format

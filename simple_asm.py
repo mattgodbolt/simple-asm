@@ -106,14 +106,14 @@ class SimpleAssembler:
 
     def __init__(self):
         self.memory = Memory()
-        self.source_ptr = 0x1000  # Source starts at $1000
-        self.output_ptr = 0x2000  # Output starts at $2000
+        self.source_ptr = 0x2000  # Source starts at $2000
+        self.output_ptr = 0x8000  # Output starts at $8000
         self.effective_pc = 0  # Effective address (where code thinks it is)
         self.reloc_offset = 0  # Offset to add to effective address for output
 
     def assemble_from_string(self, source: str) -> bytes:
         """Assemble source code from string"""
-        # Load source into memory at $1000
+        # Load source into memory at $2000
         self.memory.write_string(self.source_ptr, source)
         return self.assemble()
 
@@ -414,7 +414,7 @@ class SimpleAssembler:
         self.effective_pc = target_addr
 
 
-def format_hex_dump(data: bytes, base_address: int = 0x2000) -> str:
+def format_hex_dump(data: bytes, base_address: int = 0x8000) -> str:
     """Format binary data as hex dump"""
     lines = []
     for i in range(0, len(data), 16):

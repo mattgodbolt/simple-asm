@@ -17,6 +17,14 @@ Research project exploring 6502 assembly and bootstrapping. Focus on historical 
 - Fixed 4-byte instructions enable simple branch offset calculation
 - Zero page variables for assembler state
 
+### Branch Instruction Convention
+
+Branch operands (BEQ, BNE, BCC, etc.) are specified in **instruction counts**, not byte offsets:
+- `BEQ 05` means "skip 5 instructions" (20 bytes)  
+- Formula: actual_6502_offset = operand * 4 + 2
+- This makes it easier for humans to count instructions when writing assembly
+- Both Python and 6502 assemblers use this convention
+
 ## Testing
 
 Always verify both assemblers produce identical results. The Python version is the reference implementation.
