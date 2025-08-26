@@ -38,6 +38,8 @@ Run full test suite with `make all` and bootstrap test with `make test-bootstrap
 
 - NEVER change directory from the project root
 - ALWAYS use `uv run python` instead of just `python` to ensure correct Python version
+- ALWAYS create temporary files in `./tmp` directory, never in project root
+- ALWAYS use file tools (Write, Edit) instead of shell commands (cat, echo) for file operations
 
 ## File Naming
 

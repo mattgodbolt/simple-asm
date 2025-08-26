@@ -105,6 +105,9 @@ BNE  :COMPARE_CHARS   ; Loop back to COMPARE_CHARS
 LDY# 04     ; Point to opcode byte
 LDAY 0E     ; Get opcode value
 STAZ 0B     ; Store opcode
+; Check for END marker before writing
+CMP# FF     ; Is it END marker?
+BEQ  :END_FOUND   ; Yes, jump to assembled code
 INY         ; Point to type byte
 LDAY 0E     ; Get operand type
 STAZ 0C     ; Store type
@@ -130,6 +133,9 @@ LDAZ 0F
 CMP# 11     ; Past OPCODE_TABLE end?
 BCC  :TABLE_LOOP   ; No, continue TABLE_LOOP
 BRK         ; Error - opcode not found
+
+END_FOUND:
+JMP  8000   ; Jump to assembled code at $8000
 
 @0400       ; Align operand reading section
 ; Read operand based on type in $0C
@@ -208,6 +214,7 @@ BCS  :HEX_LETTER ; Yes, handle A-F
 SBC# 2F     ; Convert '0'-'9' (subtract '0'-1)
 RTS
 HEX_LETTER:
+CLC         ; Clear carry for proper subtraction
 SBC# 36     ; Convert 'A'-'F' (subtract 'A'-10-1)
 RTS
 
@@ -235,7 +242,9 @@ LDAZ 0C     ; Get operand type
 BEQ  :JMP_WRITE_NOPS   ; Type 0: write 3 NOPs
 CMP# 01     ; Type 1: write byte + 2 NOPs
 BEQ  :WRITE_BYTE   ; Yes, goto WRITE_BYTE
-; Type 2 or 3: write 2 bytes + 1 NOP
+CMP# 03     ; Type 3: branch with offset + 2 NOPs
+BEQ  :WRITE_BRANCH   ; Yes, goto WRITE_BRANCH
+; Type 2: write 2 bytes + 1 NOP
 LDAZ 09     ; Get low byte
 STIY 02     ; Write it
 INY         ; Next position
@@ -246,6 +255,15 @@ JMP  :PAD_INST   ; Jump to write final NOP
 
 WRITE_BYTE:
 LDAZ 09     ; Get operand byte
+STIY 02     ; Write it
+INY         ; Next position
+LDA# EA     ; NOP opcode
+STIY 02     ; Write NOP
+INY         ; Next position
+JMP  :PAD_INST   ; Jump to write final NOP
+
+WRITE_BRANCH:
+LDAZ 09     ; Get branch offset
 STIY 02     ; Write it
 INY         ; Next position
 LDA# EA     ; NOP opcode
@@ -267,7 +285,7 @@ ADC# 04     ; Add 4
 STAZ 02
 BCC  01     ; Skip if no carry
 INCZ 03     ; Increment high byte
-JMP  :CHECK_END   ; Jump to end check
+JMP  :MAIN_LOOP   ; Jump to main loop
 
 @0F40       ; Type 0 handler: write 3 NOPs
 WRITE_NOPS:
@@ -287,18 +305,10 @@ ADC# 04     ; Add 4
 STAZ 02
 BCC  01     ; Skip if no carry
 INCZ 03     ; Increment high byte
-JMP  :CHECK_END   ; Jump to end check
+JMP  :MAIN_LOOP   ; Jump to main loop
 
-@0F80       ; Align end check section
-; Check for END marker (special opcode $FF)
-CHECK_END:
-LDAZ 0B     ; Get opcode
-CMP# FF     ; Is it END marker?
-BEQ  01     ; Yes, jump to assembled code
-JMP  :MAIN_LOOP   ; No, continue assembly
-
-; Done! Jump to assembled program
-JMP  8000   ; Jump to assembled code at $8000
+@0F80       ; Align data section
+; Done! Jump to assembled program would be here, but now handled earlier
 
 ; Minimal opcode table - just what counter.punch needs
 @1000

@@ -15,10 +15,15 @@ def cpu():
 
 @pytest.fixture
 def assembler_binary():
-    """Load the assembler binary if it exists."""
+    """Load the assembler binary, generating it if needed."""
+    import subprocess
+
     binary_path = Path("assembler_source.bin")
     if not binary_path.exists():
-        pytest.skip("assembler_source.bin not found - run 'make assemble-assembler' first")
+        # Try to generate it using the makefile
+        result = subprocess.run(["make", "assemble-assembler"], capture_output=True, text=True)
+        if result.returncode != 0 or not binary_path.exists():
+            pytest.skip("Could not generate assembler_source.bin")
 
     with open(binary_path, "rb") as f:
         return f.read()

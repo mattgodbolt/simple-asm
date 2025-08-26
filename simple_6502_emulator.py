@@ -1021,6 +1021,12 @@ def main(
             click.echo(f"Error: Comparison file '{parts[2]}' not found", err=True)
             sys.exit(1)
 
+        # Zero-extend expected data if it's shorter than the emulated range
+        if len(expected) < len(emulated):
+            original_len = len(expected)
+            expected = expected + bytes(len(emulated) - len(expected))
+            click.echo(f"Zero-extended expected file from {original_len} to {len(expected)} bytes")
+
         # Compare
         if emulated == expected:
             click.echo(f"✓ Memory ${cmp_start:04X}-${cmp_end:04X} matches {parts[2]} ({len(emulated)} bytes)")
@@ -1036,7 +1042,7 @@ def main(
                     )
                     break
 
-            # Show length difference if any
+            # Show length difference if any (should not happen now due to zero-extension)
             if len(expected) != len(emulated):
                 click.echo(f"  Length mismatch: expected {len(expected)} bytes, got {len(emulated)} bytes")
 
