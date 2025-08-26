@@ -140,7 +140,8 @@ JMP  :WRITE_INST   ; Type 0: jump to WRITE_INST
 CHECK_TYPE_1:
 CMP# 01     ; Type 1: single byte
 BNE  :CHECK_TYPE_2   ; Not 1, check type 2
-JMP  :READ_BYTE   ; Type 1: jump to READ_BYTE
+JSR  :READ_BYTE   ; Type 1: call READ_BYTE
+JMP  :WRITE_INST   ; Jump to WRITE_INST
 CHECK_TYPE_2:
 CMP# 02     ; Type 2: two bytes
 BNE  :TYPE_3_BRANCH   ; Not 2, must be type 3
@@ -164,7 +165,7 @@ JSR  :HEX_TO_BYTE   ; Call hex conversion
 STAZ 09     ; Store low byte
 LDA# 00
 STAZ 0A     ; Clear high byte
-JMP  :WRITE_INST   ; Jump to WRITE_INST
+RTS         ; Return to caller
 
 @0540       ; Align READ_WORD routine
 ; Read two-byte operand (little-endian)
