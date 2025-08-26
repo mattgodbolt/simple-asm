@@ -309,10 +309,8 @@ WRITE_NOPS:
 LDA# EA     ; NOP opcode
 STIY 02     ; Write first NOP
 INY         ; Next position
-LDA# EA     ; NOP opcode
 STIY 02     ; Write second NOP
 INY         ; Next position
-LDA# EA     ; NOP opcode
 STIY 02     ; Write third NOP
 INY         ; Next position
 ; Advance output pointer by 4
