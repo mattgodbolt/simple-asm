@@ -78,7 +78,10 @@ CPY# 04     ; Read 4 chars?
 BNE  :READ_CHAR   ; Loop back to read next char
 
 ; Advance source pointer by 4
-JSR  :ADVANCE_SOURCE_4
+JSR  :ADVANCE_SOURCE
+JSR  :ADVANCE_SOURCE
+JSR  :ADVANCE_SOURCE
+JSR  :ADVANCE_SOURCE
 JMP  :LOOKUP_TABLE   ; Jump to table lookup
 
 @0300       ; Align table lookup section with room for expansion
@@ -222,16 +225,6 @@ INCZ 01     ; Increment high byte
 SKIP_SOURCE_INC:
 RTS
 
-; Advance source pointer by 4
-ADVANCE_SOURCE_4:
-CLC
-LDAZ 00
-ADC# 04
-STAZ 00
-BCC  :SKIP_SOURCE4_INC     ; Skip if no carry
-INCZ 01     ; Increment high byte
-SKIP_SOURCE4_INC:
-RTS
 
 ; Advance output pointer by 1
 ADVANCE_OUTPUT:
@@ -244,16 +237,6 @@ INCZ 03     ; Increment high byte
 SKIP_OUTPUT_INC:
 RTS
 
-; Advance output pointer by 4
-ADVANCE_OUTPUT_4:
-CLC
-LDAZ 02
-ADC# 04
-STAZ 02
-BCC  :SKIP_OUTPUT4_INC     ; Skip if no carry
-INCZ 03     ; Increment high byte
-SKIP_OUTPUT4_INC:
-RTS
 
 @0E00       ; Align WRITE_INST routine
 ; Write instruction to output

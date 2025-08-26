@@ -144,3 +144,61 @@ class TestAssembler:
             # Cleanup
             Path(f.name).unlink()
             punch_path.unlink()
+
+    def test_variable_length_instructions(self):
+        """Test that instructions produce correct native 6502 sizes."""
+        test_asm = """
+        BRK         ; 1 byte: 00
+        LDA# 42     ; 2 bytes: A9 2A
+        JMP  1234   ; 3 bytes: 4C 34 12
+        INY         ; 1 byte: C8
+        STAZ 80     ; 2 bytes: 85 80
+        JSR  5678   ; 3 bytes: 20 78 56
+        """
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".asm", delete=False) as f:
+            f.write(test_asm)
+            f.flush()
+
+            result = subprocess.run(["uv", "run", "python", "simple_asm.py", f.name], capture_output=True, text=True)
+
+            if result.returncode != 0:
+                pytest.fail(f"Assembly failed: {result.stderr}")
+
+            bin_path = Path(f.name).with_suffix(".bin")
+            with open(bin_path, "rb") as bf:
+                data = bf.read()
+
+            # Verify each instruction produces the correct native size and bytes
+            offset = 0
+
+            # BRK (1 byte)
+            assert data[offset : offset + 1] == bytes([0x00])
+            offset += 1
+
+            # LDA# 42 (2 bytes)
+            assert data[offset : offset + 2] == bytes([0xA9, 0x42])
+            offset += 2
+
+            # JMP 1234 (3 bytes, little endian)
+            assert data[offset : offset + 3] == bytes([0x4C, 0x34, 0x12])
+            offset += 3
+
+            # INY (1 byte)
+            assert data[offset : offset + 1] == bytes([0xC8])
+            offset += 1
+
+            # STAZ 80 (2 bytes)
+            assert data[offset : offset + 2] == bytes([0x85, 0x80])
+            offset += 2
+
+            # JSR 5678 (3 bytes, little endian)
+            assert data[offset : offset + 3] == bytes([0x20, 0x78, 0x56])
+            offset += 3
+
+            # Should have no padding between instructions
+            assert len(data) == offset, f"Expected {offset} bytes, got {len(data)}"
+
+            # Cleanup
+            Path(f.name).unlink()
+            bin_path.unlink()
