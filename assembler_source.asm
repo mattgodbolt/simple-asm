@@ -54,15 +54,13 @@ JMP  :CHAR_HANDLER   ; None of the above, handle as opcode
 @0280       ; Align SKIP_SPACES routine
 ; Skip spaces and newlines then read 4-character opcode
 CHAR_HANDLER:
-LDY# 00     ; Reset Y to 0
-LDAY 00     ; Read current char
+LDAY 00     ; Read current char (Y already 0 from main loop)
 CMP# 20     ; Is it space?
 BEQ  :SKIP_ADVANCE   ; Yes, advance pointer
 CMP# 0A     ; Is it newline?
 BNE  :READ_OPCODE   ; No, start reading opcode
 SKIP_ADVANCE:
-; Advance source pointer by 1
-JSR  :ADVANCE_SOURCE
+JSR  :ADVANCE_SOURCE   ; Advance source pointer by 1
 JMP  :MAIN_LOOP   ; Jump back to check for special chars
 
 ; Read 4 characters into buffer
@@ -154,9 +152,8 @@ TYPE_3_BRANCH:
 JSR  :READ_BYTE   ; Call READ_BYTE
 ; Multiply by 4 for branch offset and add 2
 LDAZ 09     ; Get byte value
-ASL         ; Shift left (×2)
+ASL         ; Shift left (×2), clears carry
 ASL         ; Shift left (×4)
-CLC         ; Clear carry
 ADC# 02     ; Add 2 to compensate for PC offset
 STAZ 09     ; Store result
 JMP  :WRITE_INST   ; Jump to WRITE_INST
