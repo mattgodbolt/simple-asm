@@ -186,20 +186,18 @@ HEX_TO_BYTE:
 LDY# 00     ; Reset Y to 0
 LDAY 00     ; Get first hex digit
 JSR  :HEX_TO_NIBBLE   ; Convert to nibble
-ASL         ; Shift to high nibble
+ASL         ; Shift to high nibble (×16)
 ASL
 ASL
 ASL
 STAZ 0D     ; Save high nibble
-; Advance source pointer
-JSR  :ADVANCE_SOURCE   ; Call ADVANCE_SOURCE
-LDY# 00     ; Reset Y to 0 again
-LDAY 00     ; Get second hex digit
+JSR  :ADVANCE_SOURCE   ; Advance to second digit
+LDAY 00     ; Get second hex digit (Y still 0)
 JSR  :HEX_TO_NIBBLE   ; Convert to nibble
 ORAZ 0D     ; Combine with high nibble
 STAZ 04     ; Store complete byte
-JSR  :ADVANCE_SOURCE   ; Advance source again
-LDAZ 04     ; Return byte in A
+JSR  :ADVANCE_SOURCE   ; Advance past second digit
+LDAZ 04     ; Load result into A before return
 RTS
 
 @05E0       ; Align HEX_NIBBLE routine
