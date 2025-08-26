@@ -19,11 +19,14 @@ Research project exploring 6502 assembly and bootstrapping. Focus on historical 
 
 ### Branch Instruction Convention
 
-Branch operands (BEQ, BNE, BCC, etc.) are specified in **instruction counts**, not byte offsets:
-- `BEQ 05` means "skip 5 instructions" (20 bytes)
-- Formula: actual_6502_offset = operand * 4 + 2
-- This makes it easier for humans to count instructions when writing assembly
-- Both Python and 6502 assemblers use this convention
+Branch operands can be specified as:
+1. **Labels** (preferred): `BEQ :END_LOOP` - resolved by punch card formatter
+2. **Instruction counts** (numeric): `BEQ 05` means "skip 5 instructions"
+   - Formula: actual_6502_offset = operand * 4 + 2
+   - This makes it easier for humans to count instructions
+   - Only use numeric when labels aren't practical
+
+Both Python and 6502 assemblers produce identical branch offsets using standard 6502 conventions.
 
 ## Testing
 

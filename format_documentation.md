@@ -37,7 +37,7 @@ END         ; End of source
 - **Comments**: Lines starting with `;` are ignored
 - **Inline comments**: Everything after `;` on a line is ignored
 - **Flexible whitespace**: Blank lines, indentation, spacing for readability
-- **Labels**: `LOOP:` (conceptual - not implemented in minimal version)
+- **Labels**: `LOOP:` for definitions, `:LOOP` for references
 - **Mixed case**: `lda#`, `LDA#`, `Lda#` all accepted
 - **Flexible operands**: `$42`, `42`, `0x42` all mean hex 42
 
@@ -69,6 +69,7 @@ END
 | Feature | Paper Format | Punch Card Format |
 |---------|-------------|-------------------|
 | Comments | ✓ Supported | ✗ Stripped |
+| Labels | ✓ Supported | ✗ Resolved to offsets |
 | Blank lines | ✓ Ignored | ✗ Not allowed |
 | Whitespace | ✓ Flexible | ✗ Minimal |
 | Opcode length | ✓ 1-4 chars | ✗ Exactly 4 chars |

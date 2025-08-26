@@ -8,7 +8,7 @@ A hand-assemblable 6502 assembler with the absolute minimum complexity needed to
 - Output defaults to address `$2000` (can be relocated with `!` directive)
 - After assembly completes, jump to the assembled program location
 - Every instruction is padded to exactly **4 bytes** using NOPs (`$EA`)
-- No labels (use comments for documentation), no expressions
+- No labels supported by the 6502 assembler itself (but punch card format supports them)
 - Addressing mode is encoded in the opcode name itself
 
 ## Instruction Format
@@ -103,13 +103,17 @@ All instructions generate exactly 4 bytes:
 | `JSR ` | `$20` | Absolute | `JSR  2100` | `20 00 21 EA` |
 
 ## Branch Offset Calculation
-Since every instruction is exactly 4 bytes:
-- Branch forward N instructions: offset = N * 4
-- Branch backward N instructions: offset = -(N * 4) = 256 - (N * 4)
+Branch operands can be specified as:
+1. **Instruction counts** (preferred when writing by hand): `BEQ 03` = skip 3 instructions
+2. **Raw 6502 offsets** (what the CPU uses): standard relative to PC+2
+
+Formula for instruction counts: `6502_offset = instruction_count * 4 + 2`
 
 Examples:
-- `BNE FD` branches back 3 instructions (FD = -12 = -3*4)
-- `BEQ 02` branches forward 2 instructions (02 = 8 = 2*4)
+- `BNE 03`: Skip 3 instructions = 6502 offset +14 = `$0E`
+- `BEQ FD`: Back 3 instructions = 6502 offset -10 = `$F6`
+
+Note: Labels are converted to these offsets by the punch card formatter.
 
 ## Assembly Process
 
@@ -204,10 +208,39 @@ Byte 5:    Operand type:
 ### Relocation Support
 ```
 !1E00       ; Set relocation offset (output_addr - effective_addr)
-@0200       ; Set effective address to $0200, fill gap with zeros
+@0200       ; Set effective address to $0200, skip forward in address space
 ```
 
 This enables bootstrap: code assembled to run at $0200 but stored at $2000.
+
+## Label Support (Python Assembler Only)
+
+The friendly format supports labels for better readability:
+
+### Two-Pass Assembly
+1. **First pass**: Collect label definitions and calculate addresses
+2. **Second pass**: Resolve label references to addresses
+
+### Label Syntax
+```assembly
+MAIN_LOOP:          ; Label definition (anywhere on line)
+  LDA# 42           ; Instructions can be indented
+  BEQ :END_PROGRAM  ; Label reference with : prefix
+  JSR :SUBROUTINE   ; Works with JSR and JMP too
+  JMP :MAIN_LOOP    ; Jump back to label
+
+END_PROGRAM:
+  BRK
+
+SUBROUTINE:
+  RTS
+```
+
+### Punch Card Conversion
+Labels are resolved during conversion to punch format:
+- `punch_card_formatter.py` handles all label resolution
+- The 6502 assembler only sees numeric offsets
+- Both assemblers produce identical machine code
 
 ## Notes
 - Relocation allows flexible memory layouts for bootstrap scenarios

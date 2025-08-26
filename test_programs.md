@@ -36,12 +36,12 @@ Tests loops and branching:
 
 ```
 LDA# 00     ; Initialize counter
-STA  80     ; Store in zero page
-LOOP:       ; (This would be address $200C in assembled code)
-INC  80     ; Increment counter
-LDA  80     ; Load counter
+STAZ 80     ; Store in zero page
+LOOP:       ; Loop label
+INCZ 80     ; Increment counter
+LDAZ 80     ; Load counter
 CMP# 0A     ; Compare with 10
-BNE  FD     ; Branch back 3 instructions (to INC 80)
+BNE  :LOOP  ; Branch back to loop (or BNE FD for hardcoded)
 BRK         ; Done
 END
 ```
@@ -62,11 +62,12 @@ Tests indexed addressing:
 
 ```
 LDX# 00     ; Initialize index
-LDA  3000   ; Load from source (absolute for simplicity)
-STA  4000   ; Store to destination
+COPY_LOOP:
+LDAX 3000   ; Load from source,X
+STAX 4000   ; Store to destination,X
 INX         ; Next byte
 CPX# 08     ; Copied 8 bytes?
-BNE  FA     ; Branch back 6 instructions
+BNE  :COPY_LOOP  ; Branch back to loop
 BRK
 END
 ```
@@ -75,13 +76,14 @@ END
 Tests JSR/RTS:
 
 ```
-JSR  0008   ; Call subroutine (8 instructions forward)
-LDA# FF     ; Main program continues
-STA  2100   ; Store result
-BRK         ; End main
-; Subroutine starts here ($2000 + 8*4 = $2020)
-LDA# 42     ; Load answer
-RTS         ; Return
+JSR  :ANSWER_SUB  ; Call subroutine
+LDA# FF           ; Main program continues
+STA  2100         ; Store result
+BRK               ; End main
+
+ANSWER_SUB:       ; Subroutine label
+LDA# 42           ; Load answer
+RTS               ; Return
 END
 ```
 
