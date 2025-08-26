@@ -59,9 +59,9 @@ CLC
 LDAZ 00
 ADC# 01
 STAZ 00
-BCC  :CHAR_HANDLER   ; Loop back
+BCC  :MAIN_LOOP   ; Loop back to check for special chars
 INCZ 01
-JMP  :CHAR_HANDLER   ; Jump back
+JMP  :MAIN_LOOP   ; Jump back to check for special chars
 
 ; Read 4 characters into buffer
 READ_OPCODE:

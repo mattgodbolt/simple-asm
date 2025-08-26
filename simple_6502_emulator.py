@@ -702,6 +702,7 @@ class CPU6502:
         watch_addrs: set[int] | None = None,
         watch_memory: dict[int, int] | None = None,
         breakpoint_addrs: set[int] | None = None,
+        debug_break_addrs: set[int] | None = None,
     ):
         """Main execution loop"""
         self.pc = start_pc
@@ -711,6 +712,7 @@ class CPU6502:
         watch_addrs = watch_addrs or set()
         watch_memory = watch_memory or {}
         breakpoint_addrs = breakpoint_addrs or set()
+        debug_break_addrs = debug_break_addrs or set()
 
         if self.trace and not self.quiet:
             print(f"Starting execution at ${start_pc:04X}")
@@ -718,11 +720,37 @@ class CPU6502:
 
         try:
             while self.cycle_count < max_cycles:
-                # Check for breakpoints (pause for user input)
+                # Check for breakpoints
                 if self.pc in breakpoint_addrs:
                     print(f"\n*** BREAKPOINT at ${self.pc:04X} after {self.cycle_count} cycles ***")
                     self.print_registers()
+
+                    # Dump assembler key memory locations
+                    if self.pc == 0x0300:  # LOOKUP_TABLE
+                        print("  Instruction buffer:", " ".join(f"${self.memory[0x0005 + i]:02X}" for i in range(4)))
+                        print(f"  Table pointer: ${self.memory[0x0F]:02X}{self.memory[0x0E]:02X}")
+                    elif self.pc == 0x0E00:  # WRITE_INST
+                        print(f"  Opcode: ${self.memory[0x0B]:02X}")
+                        print(f"  Type: ${self.memory[0x0C]:02X}")
+                        print(f"  Operand: ${self.memory[0x09]:02X}")
+                        print(f"  Output ptr: ${self.memory[0x03]:02X}{self.memory[0x02]:02X}")
+
                     input("Press Enter to continue...")
+
+                # Check for debug breakpoints (non-interactive)
+                if self.pc in debug_break_addrs:
+                    print(f"\n*** DEBUG BREAK at ${self.pc:04X} after {self.cycle_count} cycles ***")
+                    self.print_registers()
+
+                    # Dump assembler key memory locations
+                    if self.pc == 0x0300:  # LOOKUP_TABLE
+                        print("  Instruction buffer:", " ".join(f"${self.memory[0x0005 + i]:02X}" for i in range(4)))
+                        print(f"  Table pointer: ${self.memory[0x0F]:02X}{self.memory[0x0E]:02X}")
+                    elif self.pc == 0x0E00:  # WRITE_INST
+                        print(f"  Opcode: ${self.memory[0x0B]:02X}")
+                        print(f"  Type: ${self.memory[0x0C]:02X}")
+                        print(f"  Operand: ${self.memory[0x09]:02X}")
+                        print(f"  Output ptr: ${self.memory[0x03]:02X}{self.memory[0x02]:02X}")
 
                 # Check for trap addresses
                 if self.pc in trap_addresses:
@@ -805,6 +833,9 @@ class CPU6502:
 @click.option("--quiet", is_flag=True, help="Suppress non-error output except final result")
 @click.option("--watch", "watch_specs", multiple=True, help="Watch memory locations for changes (hex address)")
 @click.option("--breakpoint", "breakpoint_specs", multiple=True, help="Pause at specific PC values (hex)")
+@click.option(
+    "--debug-break", "debug_break_specs", multiple=True, help="Debug break at PC values (no pause, just dump info)"
+)
 @click.option("--max-cycles", type=int, default=1000000, help="Maximum cycles to execute (default: 1000000)")
 @click.option("--dump", type=str, help="Dump memory range after execution (format: start:end or start:end:filename)")
 @click.option("--compare", type=str, help="Compare memory dump with file (format: start:end:filename)")
@@ -819,6 +850,7 @@ def main(
     quiet,
     watch_specs,
     breakpoint_specs,
+    debug_break_specs,
     max_cycles,
     dump,
     compare,
@@ -871,6 +903,15 @@ def main(
             breakpoint_addrs.add(int(bp_spec, 16))
         except ValueError:
             click.echo(f"Error: Invalid hex breakpoint address '{bp_spec}'", err=True)
+            sys.exit(1)
+
+    # Parse debug break specs
+    debug_break_addrs = set()
+    for db_spec in debug_break_specs:
+        try:
+            debug_break_addrs.add(int(db_spec, 16))
+        except ValueError:
+            click.echo(f"Error: Invalid hex debug break address '{db_spec}'", err=True)
             sys.exit(1)
 
     # Load files into memory
@@ -930,6 +971,7 @@ def main(
         watch_addrs,
         watch_memory,
         breakpoint_addrs,
+        debug_break_addrs,
     )
 
     # Handle memory dump
