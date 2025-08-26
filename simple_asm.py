@@ -220,18 +220,13 @@ class SimpleAssembler:
                             raise ValueError(f"Unknown label: {label_name}")
                         # Calculate branch offset from current PC to label
                         target = self.labels[label_name]
-                        # 6502 branch is relative to PC after the 2-byte branch instruction
-                        pc_after_branch = self.effective_pc + 2
-                        offset_bytes = target - pc_after_branch
-                        # Validate 6502 branch limits
-                        if offset_bytes > 127 or offset_bytes < -128:
-                            raise ValueError(f"Branch to {label_name} too far: {offset_bytes} bytes")
-                        operand_low = offset_bytes & 0xFF
+                        operand_low = self._calculate_branch_offset(target)
                         operand_high = 0
                     else:
-                        # Regular hex offset (already a 6502 branch offset)
-                        offset = self._read_hex_byte()
-                        operand_low = offset
+                        # Numeric operand - instruction count format
+                        # Formula: 6502_offset = instruction_count * 4 + 2
+                        instruction_count = self._read_hex_byte()
+                        operand_low = (instruction_count * 4 + 2) & 0xFF
                         operand_high = 0
                 else:
                     raise ValueError(f"Invalid operand type: {operand_type}")
@@ -635,6 +630,18 @@ class SimpleAssembler:
         # Skip to end of line
         self._skip_to_newline()
         return int(hex_chars, 16)
+
+    def _calculate_branch_offset(self, target_address: int) -> int:
+        """Calculate 6502 branch offset from current PC to target address"""
+        # 6502 branch is relative to PC after the 2-byte branch instruction
+        pc_after_branch = self.effective_pc + 2
+        offset_bytes = target_address - pc_after_branch
+
+        # Validate 6502 branch limits
+        if offset_bytes > 127 or offset_bytes < -128:
+            raise ValueError(f"Branch target too far: {offset_bytes} bytes")
+
+        return offset_bytes & 0xFF
 
     def _skip_to_address(self, target_addr: int, output: list) -> None:
         """Skip effective PC forward to target address, filling gap with zeros"""

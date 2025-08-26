@@ -124,25 +124,40 @@ def format_instruction(opcode: str, operand: str) -> str:
 
 
 def resolve_branch_offset(from_address: int, to_address: int) -> str:
-    """Convert address difference to branch offset hex for 6502"""
+    """Convert address difference to instruction count format for consistency"""
     # 6502 branch is relative to PC after the 2-byte branch instruction
-    # But we're working with 4-byte instructions, so we need to account for this
     pc_after_branch = from_address + 2  # 6502 PC after branch instruction
     offset_bytes = to_address - pc_after_branch
 
     # Validate 6502 branch limits
-    if offset_bytes >= 0:
-        # Forward branch
-        if offset_bytes > 127:  # Max forward branch in 6502
-            raise ValueError(f"Forward branch too far: {offset_bytes} bytes")
-        return f"{offset_bytes:02X}"
+    if offset_bytes > 127 or offset_bytes < -128:
+        raise ValueError(f"Branch target too far: {offset_bytes} bytes")
+
+    # Convert from 6502 offset back to instruction count format
+    # Formula: 6502_offset = instruction_count * 4 + 2
+    # Reverse: instruction_count = (6502_offset - 2) / 4
+    if offset_bytes >= 2:
+        # Forward branch - subtract 2 and divide by 4
+        instruction_count = (offset_bytes - 2) // 4
+        if (offset_bytes - 2) % 4 != 0:
+            raise ValueError(f"Branch offset {offset_bytes} doesn't align to 4-byte instructions")
+        return f"{instruction_count:02X}"
     else:
-        # Backward branch
-        if offset_bytes < -128:  # Max backward branch in 6502
-            raise ValueError(f"Backward branch too far: {offset_bytes} bytes")
-        # Two's complement
-        hex_offset = (256 + offset_bytes) & 0xFF
-        return f"{hex_offset:02X}"
+        # Backward branch or short forward - need to handle carefully
+        # For backward: offset_bytes is negative, so we need two's complement
+        if offset_bytes < 0:
+            # Two's complement, then apply reverse formula
+            positive_offset = 256 + offset_bytes  # Convert from two's complement
+            instruction_count = (positive_offset - 2) // 4
+            if (positive_offset - 2) % 4 != 0:
+                raise ValueError(f"Branch offset {offset_bytes} doesn't align to 4-byte instructions")
+            # Convert back to two's complement instruction count
+            if instruction_count > 127:
+                instruction_count = instruction_count - 256
+            return f"{instruction_count & 0xFF:02X}"
+        else:
+            # offset_bytes is 0 or 1 - these are too small for our formula
+            raise ValueError(f"Branch offset {offset_bytes} too small for instruction count format")
 
 
 def convert_to_punch_format(source_lines: list[str]) -> list[str]:
