@@ -49,7 +49,7 @@ class TestLabels:
         LDA# 42
         JSR  :END
         BRK
-        
+
         END:
         STAZ 80
         JSR  :START
@@ -94,7 +94,11 @@ class TestLabels:
 
             # Should fail because punch format doesn't support labels
             assert result.returncode != 0
-            assert "Unknown label" in result.stdout or "Unknown label" in result.stderr or "Invalid operand" in result.stderr
+            assert (
+                "Unknown label" in result.stdout
+                or "Unknown label" in result.stderr
+                or "Invalid operand" in result.stderr
+            )
 
             # Cleanup
             Path(f.name).unlink()
