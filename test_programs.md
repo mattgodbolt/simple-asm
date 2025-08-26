@@ -100,7 +100,7 @@ To verify our design works, we'll create a Python version that implements the ex
 1. Read source from specified address (simulated)
 2. Parse 4-character opcodes
 3. Look up in identical opcode table
-4. Generate 4-byte padded instructions
+4. Generate native 6502 instructions
 5. Output to specified address (simulated)
 
 This Python version will let us:

@@ -92,17 +92,17 @@ Entry 2: 4C 44 41 5A    ; "LDAZ"
 
 ## Type Codes
 - **Type 0**: No operand (implied instructions)
-  - Output: [opcode] EA EA EA
+  - Output: [opcode]
 
 - **Type 1**: Single byte operand
-  - Output: [opcode] [operand] EA EA
+  - Output: [opcode] [operand]
 
 - **Type 2**: Two byte operand (little-endian)
-  - Output: [opcode] [low-byte] [high-byte] EA
+  - Output: [opcode] [low-byte] [high-byte]
 
-- **Type 3**: Branch offset (multiply by 4 for 4-byte instruction spacing)
-  - Input: signed instruction count (-128 to +127)
-  - Output: [opcode] [offset*4] EA EA
+- **Type 3**: Branch offset (native 6502 PC+2 relative addressing)
+  - Input: signed byte offset (-128 to +127)
+  - Output: [opcode] [offset]
 
 ## Special Cases
 

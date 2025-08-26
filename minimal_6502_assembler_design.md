@@ -1,5 +1,7 @@
 # Minimal 6502 Assembler Design
 
+> **Note**: This document describes the assembler evolution. The current implementation uses native 6502 instruction sizes (1-3 bytes) instead of the original 4-byte padded format shown in examples below.
+
 ## Overview
 A hand-assemblable 6502 assembler with the absolute minimum complexity needed to bootstrap a better assembler.
 
@@ -7,7 +9,7 @@ A hand-assemblable 6502 assembler with the absolute minimum complexity needed to
 - Source code is read from address `$1000` (all numbers in hex)
 - Output defaults to address `$2000` (can be relocated with `!` directive)
 - After assembly completes, jump to the assembled program location
-- Every instruction is padded to exactly **4 bytes** using NOPs (`$EA`)
+- Instructions use **native 6502 sizes** (1-3 bytes, no padding)
 - No labels supported by the 6502 assembler itself (but punch card format supports them)
 - Addressing mode is encoded in the opcode name itself
 
@@ -22,9 +24,11 @@ OPCD HHHHH
 - `HHH`: Hex operand (1-4 digits, no $ prefix needed)
 
 ### Output Format
-All instructions generate exactly 4 bytes:
+Instructions use native 6502 sizes:
 ```
-[opcode] [operand-low] [operand-high/NOP] [NOP]
+1 byte:  [opcode]                    (BRK, INY, CLC, etc.)
+2 bytes: [opcode] [operand]         (LDA#, STAZ, branches)
+3 bytes: [opcode] [low] [high]      (JMP, JSR with addresses)
 ```
 
 ## Supported Instructions
@@ -32,20 +36,20 @@ All instructions generate exactly 4 bytes:
 ### Memory Operations
 | Mnemonic | Opcode | Mode | Example | Output |
 |----------|--------|------|---------|--------|
-| `LDA#` | `$A9` | Immediate | `LDA# 42` | `A9 42 EA EA` |
-| `LDAZ` | `$A5` | Zero Page | `LDAZ 80` | `A5 80 EA EA` |
-| `LDA ` | `$AD` | Absolute | `LDA  3000` | `AD 00 30 EA` |
-| `STA ` | `$8D` | Absolute | `STA  2100` | `8D 00 21 EA` |
-| `STAZ` | `$85` | Zero Page | `STAZ 80` | `85 80 EA EA` |
-| `LDX#` | `$A2` | Immediate | `LDX# 00` | `A2 00 EA EA` |
-| `LDXZ` | `$A6` | Zero Page | `LDXZ 80` | `A6 80 EA EA` |
-| `LDX ` | `$AE` | Absolute | `LDX  3000` | `AE 00 30 EA` |
-| `LDY#` | `$A0` | Immediate | `LDY# FF` | `A0 FF EA EA` |
-| `LDYZ` | `$A4` | Zero Page | `LDYZ 80` | `A4 80 EA EA` |
-| `LDY ` | `$AC` | Absolute | `LDY  3000` | `AC 00 30 EA` |
-| `STX ` | `$8E` | Absolute | `STX  2000` | `8E 00 20 EA` |
-| `STXZ` | `$86` | Zero Page | `STXZ 80` | `86 80 EA EA` |
-| `STY ` | `$8C` | Absolute | `STY  2000` | `8C 00 20 EA` |
+| `LDA#` | `$A9` | Immediate | `LDA# 42` | `A9 42` |
+| `LDAZ` | `$A5` | Zero Page | `LDAZ 80` | `A5 80` |
+| `LDA ` | `$AD` | Absolute | `LDA  3000` | `AD 00 30` |
+| `STA ` | `$8D` | Absolute | `STA  2100` | `8D 00 21` |
+| `STAZ` | `$85` | Zero Page | `STAZ 80` | `85 80` |
+| `LDX#` | `$A2` | Immediate | `LDX# 00` | `A2 00` |
+| `LDXZ` | `$A6` | Zero Page | `LDXZ 80` | `A6 80` |
+| `LDX ` | `$AE` | Absolute | `LDX  3000` | `AE 00 30` |
+| `LDY#` | `$A0` | Immediate | `LDY# FF` | `A0 FF` |
+| `LDYZ` | `$A4` | Zero Page | `LDYZ 80` | `A4 80` |
+| `LDY ` | `$AC` | Absolute | `LDY  3000` | `AC 00 30` |
+| `STX ` | `$8E` | Absolute | `STX  2000` | `8E 00 20` |
+| `STXZ` | `$86` | Zero Page | `STXZ 80` | `86 80` |
+| `STY ` | `$8C` | Absolute | `STY  2000` | `8C 00 20` |
 | `STYZ` | `$84` | Zero Page | `STYZ 80` | `84 80 EA EA` |
 
 ### Indexed Operations
@@ -134,9 +138,9 @@ Note: Labels are converted to these offsets by the punch card formatter.
    - Read hex operand (if present)
    - Look up opcode in table
    - Write opcode byte
-   - Write operand bytes (or NOPs)
-   - Pad to 4 bytes with NOPs
-   - Advance write pointer by 4
+   - Write operand bytes (native 6502 sizes)
+   - No padding needed
+   - Advance write pointer by instruction size (1-3 bytes)
 3. **Terminate**: When "END " found or source exhausted
 4. **Execute**: Jump to `$2000`
 

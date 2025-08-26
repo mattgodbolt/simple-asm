@@ -38,8 +38,8 @@ STA  2000   ; Store result at $2000
         BNE  FE     ; Branch back if not zero (to DEX above)
 
     ; Repeat forever - calculate offset to DISPLAY_LOOP
-    ; From here back to "LDA 2000" is about 11 instructions * 4 bytes = 44 = $2C
-    ; So we need BNE D4 (which is -44 in two's complement)
+    ; With native 6502 sizes, branch calculation depends on actual instruction lengths
+    ; Use labels instead of manual offset calculation
     JMP  2008   ; Jump back to start (absolute address)
 
 ; This would be the end in a real program

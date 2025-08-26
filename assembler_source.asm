@@ -1,11 +1,10 @@
 ; Minimal 6502 Assembler Source Code
-; Written in our restricted 4-byte instruction format
+; Written using native 6502 instruction formats
 ; Reads source from $2000, assembles to $8000
 ;
 ; CODING STANDARDS FOLLOWED:
 ; - Memory alignment: All jump targets and data aligned with @xxxx directives
-; - Control flow: Labels used for all branch/jump targets except single-instruction skips
-; - Single instruction skips: Use literal 01 for conditional branches (BNE 01, etc.)
+; - Control flow: Always use labels for all branch/jump targets (BEQ :SKIP, etc.)
 ; - Documentation: Comments describe intent and memory layout, not machine code bytes
 ; - Address loading: High/low byte loads clearly documented with table references
 
