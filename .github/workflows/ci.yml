@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  linting:
+    name: Code Quality & Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run pre-commit hooks (excluding tests)
+        env:
+          SKIP: test,test-punch-consistency,test-bootstrap
+        run: uv run pre-commit run --all-files
+
+  testing:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run pytest tests
+        run: uv run pytest
+
+      - name: Test punch format consistency
+        run: uv run make test-punch-consistency
+
+      - name: Test bootstrap (assembler self-assembly)
+        run: uv run make test-bootstrap
