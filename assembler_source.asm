@@ -1,25 +1,32 @@
 ; Minimal 6502 Assembler Source Code
 ; Written in our restricted 4-byte instruction format
 ; Reads source from $2000, assembles to $8000
+;
+; CODING STANDARDS FOLLOWED:
+; - Memory alignment: All jump targets and data aligned with @xxxx directives
+; - Control flow: Labels used for all branch/jump targets except single-instruction skips
+; - Single instruction skips: Use literal 01 for conditional branches (BNE 01, etc.)
+; - Documentation: Comments describe intent and memory layout, not machine code bytes
+; - Address loading: High/low byte loads clearly documented with table references
 
 !0000        ; Code assembled to $8000 but runs as if at $0000
 @0200        ; Entry point at $0200
 ; Initialize source pointer to $2000
-LDA# 00
+LDA# 00     ; Low byte of source at $2000
 STAZ 00     ; Store to zero page $00
-LDA# 20
+LDA# 20     ; High byte of source at $2000
 STAZ 01     ; Store to zero page $01
 
 ; Initialize output pointer to $8000
-LDA# 00
+LDA# 00     ; Low byte of output at $8000
 STAZ 02     ; Store to zero page $02
-LDA# 80
+LDA# 80     ; High byte of output at $8000
 STAZ 03     ; Store to zero page $03
 
 ; Initialize effective PC to $8000 (same as output initially)
-LDA# 00
+LDA# 00     ; Low byte of effective PC at $8000
 STAZ 10     ; Store to zero page $10 (effective PC low)
-LDA# 80
+LDA# 80     ; High byte of effective PC at $8000
 STAZ 11     ; Store to zero page $11 (effective PC high)
 
 JMP  :MAIN_LOOP   ; Jump to main loop
@@ -83,11 +90,11 @@ INCZ 01     ; Increment high byte
 JMP  :LOOKUP_TABLE   ; Jump to table lookup
 
 @0300       ; Align table lookup section with room for expansion
-; Look up opcode in table at $0500
+; Look up opcode in table at $1000
 LOOKUP_TABLE:
-LDA# 00     ; Table pointer low
+LDA# 00     ; Low byte of opcode table at $1000
 STAZ 0E
-LDA# 10     ; Table pointer high
+LDA# 10     ; High byte of opcode table at $1000
 STAZ 0F
 
 ; Compare current table entry with opcode buffer

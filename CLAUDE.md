@@ -17,14 +17,23 @@ Research project exploring 6502 assembly and bootstrapping. Focus on historical 
 - Fixed 4-byte instructions enable simple branch offset calculation
 - Zero page variables for assembler state
 
-### Branch Instruction Convention
+### Assembly Coding Standards
 
-Branch operands can be specified as:
-1. **Labels** (preferred): `BEQ :END_LOOP` - resolved by punch card formatter
-2. **Instruction counts** (numeric): `BEQ 05` means "skip 5 instructions"
-   - Formula: actual_6502_offset = operand * 4 + 2
-   - This makes it easier for humans to count instructions
-   - Only use numeric when labels aren't practical
+**Memory Layout:**
+- Always align jump targets and data to known locations with `@xxxx` directives
+- Use `@` to ensure critical code sections land at predictable addresses
+
+**Control Flow:**
+- Always use labels for branch and jump targets: `BEQ :LOOP_END`, `JMP :MAIN_LOOP`
+- ONE exception: conditional branches to skip exactly one instruction may use literal `01`: `BNE 01`
+- Formula: actual_6502_offset = operand * 4 + 2 (for manual calculation only)
+
+**Code Documentation:**
+- Do NOT include machine code bytes in comments (e.g. avoid `; A9 42 EA EA`)
+- When loading address table values, clearly comment the purpose:
+  - `LDA# 10` ; High byte of opcode table ($1000)
+  - `LDA# 00` ; Low byte of opcode table ($1000)
+- Comment the intent and memory layout, not the encoding
 
 Both Python and 6502 assemblers produce identical branch offsets using standard 6502 conventions.
 
