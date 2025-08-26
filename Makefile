@@ -110,18 +110,14 @@ docs:  ## View format documentation
 clean-outputs:  ## Clean generated binary files
 	rm -f *.bin bootstrap-output.bin
 
-.PHONY: clean-punch
-clean-punch:  ## Clean generated punch card files (keeps examples as fixtures)
-	@echo "Punch card files are kept as test fixtures"
-	@echo "Use 'make format-examples' to regenerate them"
-
 .PHONY: clean
 clean: clean-outputs  ## Clean generated files (not dependencies)
-	rm -f *.bin bootstrap-output.bin
+	rm -f *.bin *.punch bootstrap-output.bin
+	rm -rf tmp/
 
 .PHONY: clean-all
-clean-all:  ## Clean everything including uv environment
-	rm -rf $(UV_VENV) *.bin bootstrap-output.bin
+clean-all: clean  ## Clean everything including uv environment
+	rm -rf $(UV_VENV)
 
 # Test punch format consistency
 .PHONY: test-punch-consistency

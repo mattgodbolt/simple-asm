@@ -38,9 +38,15 @@ All instructions generate exactly 4 bytes:
 | `STA ` | `$8D` | Absolute | `STA  2100` | `8D 00 21 EA` |
 | `STAZ` | `$85` | Zero Page | `STAZ 80` | `85 80 EA EA` |
 | `LDX#` | `$A2` | Immediate | `LDX# 00` | `A2 00 EA EA` |
+| `LDXZ` | `$A6` | Zero Page | `LDXZ 80` | `A6 80 EA EA` |
+| `LDX ` | `$AE` | Absolute | `LDX  3000` | `AE 00 30 EA` |
 | `LDY#` | `$A0` | Immediate | `LDY# FF` | `A0 FF EA EA` |
+| `LDYZ` | `$A4` | Zero Page | `LDYZ 80` | `A4 80 EA EA` |
+| `LDY ` | `$AC` | Absolute | `LDY  3000` | `AC 00 30 EA` |
 | `STX ` | `$8E` | Absolute | `STX  2000` | `8E 00 20 EA` |
+| `STXZ` | `$86` | Zero Page | `STXZ 80` | `86 80 EA EA` |
 | `STY ` | `$8C` | Absolute | `STY  2000` | `8C 00 20 EA` |
+| `STYZ` | `$84` | Zero Page | `STYZ 80` | `84 80 EA EA` |
 
 ### Indexed Operations
 | Mnemonic | Opcode | Mode | Example | Output |
@@ -58,8 +64,12 @@ All instructions generate exactly 4 bytes:
 | `CMP#` | `$C9` | Immediate | `CMP# 00` | `C9 00 EA EA` |
 | `CMPZ` | `$C5` | Zero Page | `CMPZ 80` | `C5 80 EA EA` |
 | `CMP ` | `$CD` | Absolute | `CMP  2000` | `CD 00 20 EA` |
+| `CPX#` | `$E0` | Immediate | `CPX# 10` | `E0 10 EA EA` |
+| `CPY#` | `$C0` | Immediate | `CPY# 10` | `C0 10 EA EA` |
 | `INC ` | `$EE` | Absolute | `INC  2000` | `EE 00 20 EA` |
+| `INCZ` | `$E6` | Zero Page | `INCZ 80` | `E6 80 EA EA` |
 | `DEC ` | `$CE` | Absolute | `DEC  2000` | `CE 00 20 EA` |
+| `DECZ` | `$C6` | Zero Page | `DECZ 80` | `C6 80 EA EA` |
 
 ### Register Operations
 | Mnemonic | Opcode | Mode | Example | Output |

@@ -2,6 +2,8 @@
 
 A minimal 6502 assembler system for bootstrapping research. This implements the historical workflow of writing assembly on paper, converting to punch cards, then feeding to a machine assembler.
 
+**Note**: This project requires `uv` for Python dependency management. Install it from https://docs.astral.sh/uv/
+
 ## What This Is
 
 Two assemblers that produce identical output:

@@ -1,6 +1,8 @@
-# Bootstrapping a Computer - Script Outline (Revised)
+# Original Computerphile Video Idea - Bootstrapping a Computer
 
-*[Estimated 20-25 minutes total recording time]*
+*Note: This document is a presentation script originally written for a Computerphile video about the bootstrapping process.*
+
+*[Original content: Estimated 20-25 minutes total recording time]*
 
 ## Opening Hook (2-3 mins)
 "Right, so in my previous videos I've talked about this robot executing simple instructions - numbers in boxes, machine code, all that good stuff. But there's something I've completely glossed over..."
