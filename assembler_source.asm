@@ -466,6 +466,8 @@ STAZ 10     ; Update effective PC low
 LDAZ 06
 STAZ 11     ; Update effective PC high
 
+; Skip newline after directive
+JSR  :ADVANCE_SOURCE
 JMP  :MAIN_LOOP   ; Back to main loop
 
 @1280       ; # hex data handler
@@ -561,6 +563,9 @@ STAZ 11     ; Store as effective PC high
 ; Note: We need to track effective PC separately from output pointer
 ; Output pointer ($02-03) is where we write
 ; Effective PC ($10-11) is what address the code thinks it's at
+
+; Skip newline after directive
+JSR  :ADVANCE_SOURCE
 JMP  :MAIN_LOOP   ; Back to main loop
 
 ; End of assembler program
