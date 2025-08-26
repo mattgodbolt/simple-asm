@@ -203,9 +203,10 @@ RTS
 ; Input: A = ASCII char, Output: A = nibble
 HEX_TO_NIBBLE:
 CMP# 41     ; Is it >= 'A'?
-BCS  02     ; Yes, handle A-F
+BCS  :HEX_LETTER ; Yes, handle A-F
 SBC# 2F     ; Convert '0'-'9' (subtract '0'-1)
 RTS
+HEX_LETTER:
 SBC# 36     ; Convert 'A'-'F' (subtract 'A'-10-1)
 RTS
 
@@ -230,8 +231,7 @@ INY         ; Next position
 
 ; Write operand bytes or NOPs based on type
 LDAZ 0C     ; Get operand type
-BEQ  02     ; Type 0: write 3 NOPs
-JMP  :WRITE_NOPS   ; Jump to type 0 handler
+BEQ  :JMP_WRITE_NOPS   ; Type 0: write 3 NOPs
 CMP# 01     ; Type 1: write byte + 2 NOPs
 BEQ  :WRITE_BYTE   ; Yes, goto WRITE_BYTE
 ; Type 2 or 3: write 2 bytes + 1 NOP
@@ -251,6 +251,9 @@ LDA# EA     ; NOP opcode
 STIY 02     ; Write NOP
 INY         ; Next position
 JMP  :PAD_INST   ; Jump to write final NOP
+
+JMP_WRITE_NOPS:
+JMP  :WRITE_NOPS ; Jump to type 0 handler
 
 @0F00       ; Align final NOP writing section
 PAD_INST:
@@ -290,7 +293,7 @@ JMP  :CHECK_END   ; Jump to end check
 CHECK_END:
 LDAZ 0B     ; Get opcode
 CMP# FF     ; Is it END marker?
-BEQ  02     ; Yes, jump to assembled code
+BEQ  01     ; Yes, jump to assembled code
 JMP  :MAIN_LOOP   ; No, continue assembly
 
 ; Done! Jump to assembled program
