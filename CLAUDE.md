@@ -6,7 +6,7 @@ Research project exploring 6502 assembly and bootstrapping. Focus on historical 
 
 - Keep the 6502 assembler brutally simple (must be hand-assemblable)
 - Both formats (friendly .asm and punch .punch) must produce identical output
-- Every instruction is exactly 4 bytes (padded with NOPs)
+- Native 6502 instruction sizes (no padding)
 - No error checking - garbage in, garbage out
 - Historical punch card workflow simulation
 
@@ -14,7 +14,7 @@ Research project exploring 6502 assembly and bootstrapping. Focus on historical 
 
 - Source at $1000, output at $2000
 - Bootstrap: assembler runs at $0200 but assembles at $2000 (relocation)
-- Fixed 4-byte instructions enable simple branch offset calculation
+- Native 6502 branch offsets (PC+2 relative)
 - Zero page variables for assembler state
 
 ### Assembly Coding Standards
@@ -24,9 +24,9 @@ Research project exploring 6502 assembly and bootstrapping. Focus on historical 
 - Use `@` to ensure critical code sections land at predictable addresses
 
 **Control Flow:**
-- Always use labels for branch and jump targets: `BEQ :LOOP_END`, `JMP :MAIN_LOOP`
-- ONE exception: conditional branches to skip exactly one instruction may use literal `01`: `BNE 01`
-- Formula: actual_6502_offset = operand * 4 + 2 (for manual calculation only)
+- Always use labels for all branch and jump targets: `BEQ :LOOP_END`, `JMP :MAIN_LOOP`
+- NO exceptions - never use numeric offsets like "01"
+- Branch offsets use native 6502 format (PC+2 relative)
 
 **Code Documentation:**
 - Do NOT include machine code bytes in comments (e.g. avoid `; A9 42 EA EA`)
@@ -35,7 +35,7 @@ Research project exploring 6502 assembly and bootstrapping. Focus on historical 
   - `LDA# 00` ; Low byte of opcode table ($1000)
 - Comment the intent and memory layout, not the encoding
 
-Both Python and 6502 assemblers produce identical branch offsets using standard 6502 conventions.
+Both Python and 6502 assemblers produce identical output using native 6502 instruction formats.
 
 ## Testing
 

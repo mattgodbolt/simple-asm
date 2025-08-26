@@ -38,17 +38,21 @@ MAIN_LOOP:
 LDY# 00     ; Reset Y to 0
 LDAY 00     ; Peek at first character
 CMP# 21     ; Is it '!' ($21)?
-BNE  01     ; Not !, skip next instruction
+BNE  :SKIP_EXCLAMATION     ; Not !, skip HANDLE_EXCLAMATION jump
 JMP  :HANDLE_EXCLAMATION
+SKIP_EXCLAMATION:
 CMP# 40     ; Is it '@' ($40)?
-BNE  01     ; Not @, skip next instruction
+BNE  :SKIP_AT     ; Not @, skip HANDLE_AT jump
 JMP  :HANDLE_AT
+SKIP_AT:
 CMP# 23     ; Is it '#' ($23)?
-BNE  01     ; Not #, skip next instruction
+BNE  :SKIP_HASH     ; Not #, skip HANDLE_HASH jump
 JMP  :HANDLE_HASH
+SKIP_HASH:
 CMP# 22     ; Is it '"' ($22)?
-BNE  01     ; Not ", skip next instruction
+BNE  :SKIP_STRING     ; Not ", skip HANDLE_STRING jump
 JMP  :HANDLE_STRING
+SKIP_STRING:
 JMP  :CHAR_HANDLER   ; None of the above, handle as opcode
 
 @0280       ; Align SKIP_SPACES routine
@@ -110,8 +114,9 @@ STAZ 0C     ; Store type
 LDY# 00     ; Reset Y to 0
 LDAY 00     ; Get character at source pointer
 CMP# 20     ; Is it a space?
-BNE  01     ; No, skip advance
+BNE  :SKIP_SPACE_ADVANCE     ; No, skip advance
 JSR  :ADVANCE_SOURCE   ; Yes, advance source pointer
+SKIP_SPACE_ADVANCE:
 JMP  :READ_OPERAND   ; Jump to READ_OPERAND
 
 ; No match - advance to next table entry
@@ -120,8 +125,9 @@ CLC
 LDAZ 0E     ; Table pointer low
 ADC# 06     ; Each entry is 6 bytes
 STAZ 0E
-BCC  01     ; Skip if no carry
+BCC  :SKIP_TABLE_INC     ; Skip if no carry
 INCZ 0F     ; Increment high byte
+SKIP_TABLE_INC:
 
 ; Check for end of table
 LDAZ 0F
@@ -217,8 +223,9 @@ CLC
 LDAZ 00
 ADC# 01
 STAZ 00
-BCC  01
-INCZ 01
+BCC  :SKIP_SOURCE_INC     ; Skip if no carry
+INCZ 01     ; Increment high byte
+SKIP_SOURCE_INC:
 RTS
 
 ; Advance source pointer by 4
@@ -227,8 +234,9 @@ CLC
 LDAZ 00
 ADC# 04
 STAZ 00
-BCC  01
-INCZ 01
+BCC  :SKIP_SOURCE4_INC     ; Skip if no carry
+INCZ 01     ; Increment high byte
+SKIP_SOURCE4_INC:
 RTS
 
 ; Advance output pointer by 1
@@ -237,8 +245,9 @@ CLC
 LDAZ 02
 ADC# 01
 STAZ 02
-BCC  01
-INCZ 03
+BCC  :SKIP_OUTPUT_INC     ; Skip if no carry
+INCZ 03     ; Increment high byte
+SKIP_OUTPUT_INC:
 RTS
 
 ; Advance output pointer by 4
@@ -247,8 +256,9 @@ CLC
 LDAZ 02
 ADC# 04
 STAZ 02
-BCC  01
-INCZ 03
+BCC  :SKIP_OUTPUT4_INC     ; Skip if no carry
+INCZ 03     ; Increment high byte
+SKIP_OUTPUT4_INC:
 RTS
 
 @0E00       ; Align WRITE_INST routine

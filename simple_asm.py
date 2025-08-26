@@ -172,9 +172,7 @@ class SimpleAssembler:
                 word = self._read_word()
 
                 if word.endswith(":"):
-                    # This is a label definition
-                    label_name = word[:-1]  # Remove the colon
-                    self.labels[label_name] = self.effective_pc
+                    # This is a label definition - already processed in first pass
                     self._skip_to_newline()
                     continue
                 else:
@@ -361,6 +359,10 @@ class SimpleAssembler:
                 if word.endswith(":"):
                     # This is a label definition
                     label_name = word[:-1]  # Remove the colon
+                    if label_name in self.labels:
+                        raise ValueError(
+                            f"Duplicate label: '{label_name}' already defined at ${self.labels[label_name]:04X}"
+                        )
                     self.labels[label_name] = self.effective_pc
                     self._skip_to_newline()
                     continue
@@ -639,7 +641,9 @@ class SimpleAssembler:
 
         # Validate 6502 branch limits
         if offset_bytes > 127 or offset_bytes < -128:
-            raise ValueError(f"Branch target too far: {offset_bytes} bytes")
+            raise ValueError(
+                f"Branch target too far: {offset_bytes} bytes (PC=${self.effective_pc:04X}, target=${target_address:04X})"
+            )
 
         return offset_bytes & 0xFF
 
