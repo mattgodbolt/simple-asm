@@ -34,9 +34,9 @@ class TestLabels:
 
             # LOOP is at address 8000, so JSR :LOOP should be JSR $8000
             # JSR is 20, followed by little-endian address 00 80
-            assert data[0:4] == bytes([0xA9, 0x42, 0xEA, 0xEA])  # LDA #42
-            assert data[4:8] == bytes([0x20, 0x00, 0x80, 0xEA])  # JSR $8000
-            assert data[8:12] == bytes([0x00, 0xEA, 0xEA, 0xEA])  # BRK
+            assert data[0:2] == bytes([0xA9, 0x42])  # LDA #42
+            assert data[2:5] == bytes([0x20, 0x00, 0x80])  # JSR $8000
+            assert data[5:6] == bytes([0x00])  # BRK
 
             # Cleanup
             Path(f.name).unlink()
@@ -68,12 +68,12 @@ class TestLabels:
             with open(bin_path, "rb") as bf:
                 data = bf.read()
 
-            # START at 8000, END at 800C
-            assert data[0:4] == bytes([0xA9, 0x42, 0xEA, 0xEA])  # LDA #42
-            assert data[4:8] == bytes([0x20, 0x0C, 0x80, 0xEA])  # JSR END ($800C)
-            assert data[8:12] == bytes([0x00, 0xEA, 0xEA, 0xEA])  # BRK
-            assert data[12:16] == bytes([0x85, 0x80, 0xEA, 0xEA])  # STAZ 80
-            assert data[16:20] == bytes([0x20, 0x00, 0x80, 0xEA])  # JSR START ($8000)
+            # START at 8000, END at 8006
+            assert data[0:2] == bytes([0xA9, 0x42])  # LDA #42
+            assert data[2:5] == bytes([0x20, 0x06, 0x80])  # JSR END ($8006)
+            assert data[5:6] == bytes([0x00])  # BRK
+            assert data[6:8] == bytes([0x85, 0x80])  # STAZ 80
+            assert data[8:11] == bytes([0x20, 0x00, 0x80])  # JSR START ($8000)
 
             # Cleanup
             Path(f.name).unlink()

@@ -156,12 +156,6 @@ JMP  :READ_WORD   ; Type 2: jump to READ_WORD
 TYPE_3_BRANCH:
 ; Must be type 3: branch
 JSR  :READ_BYTE   ; Call READ_BYTE
-; Multiply by 4 for branch offset and add 2
-LDAZ 09     ; Get byte value
-ASL         ; Shift left (×2), clears carry
-ASL         ; Shift left (×4)
-ADC# 02     ; Add 2 to compensate for PC offset
-STAZ 09     ; Store result
 JMP  :WRITE_INST   ; Jump to WRITE_INST
 
 @0500       ; Align READ_BYTE routine
@@ -269,62 +263,45 @@ LDAZ 0B     ; Get opcode
 STIY 02     ; Write to (output),Y
 INY         ; Next position
 
-; Write operand bytes or NOPs based on type
+; Write operand bytes based on type
 LDAZ 0C     ; Get operand type
-BEQ  :JMP_WRITE_NOPS   ; Type 0: write 3 NOPs
-CMP# 01     ; Type 1: write byte + 2 NOPs
+BEQ  :FINISH_INST   ; Type 0: no operands, finish
+CMP# 01     ; Type 1: write single byte
 BEQ  :WRITE_BYTE   ; Yes, goto WRITE_BYTE
-CMP# 03     ; Type 3: branch with offset + 2 NOPs
-BEQ  :WRITE_BRANCH   ; Yes, goto WRITE_BRANCH
-; Type 2: write 2 bytes + 1 NOP
+CMP# 03     ; Type 3: branch with offset
+BEQ  :WRITE_BYTE   ; Same as type 1 - single byte
+; Type 2: write 2 bytes
 LDAZ 09     ; Get low byte
 STIY 02     ; Write it
 INY         ; Next position
 LDAZ 0A     ; Get high byte
 STIY 02     ; Write it
-INY         ; Next position
-JMP  :PAD_INST   ; Jump to write final NOP
+JMP  :FINISH_INST   ; Finish instruction
 
 WRITE_BYTE:
 LDAZ 09     ; Get operand byte
 STIY 02     ; Write it
-INY         ; Next position
-LDA# EA     ; NOP opcode
-STIY 02     ; Write NOP
-INY         ; Next position
-JMP  :PAD_INST   ; Jump to write final NOP
+; Fall through to FINISH_INST
 
-WRITE_BRANCH:
-LDAZ 09     ; Get branch offset
-STIY 02     ; Write it
-INY         ; Next position
-LDA# EA     ; NOP opcode
-STIY 02     ; Write NOP
-INY         ; Next position
-JMP  :PAD_INST   ; Jump to write final NOP
-
-JMP_WRITE_NOPS:
-JMP  :WRITE_NOPS ; Jump to type 0 handler
-
-@0F00       ; Align final NOP writing section
-PAD_INST:
-LDA# EA     ; NOP opcode
-STIY 02     ; Write final NOP
-; Advance output pointer by 4
-JSR  :ADVANCE_OUTPUT_4
+FINISH_INST:
+; Advance output pointer by actual instruction length based on operand type
+; Type 0 (BRK): 1 byte
+; Type 1/3 (LDA# 42, BNE 03): 2 bytes
+; Type 2 (JMP 1234): 3 bytes
+LDAZ 0C     ; Get operand type
+BEQ  :ADVANCE_1     ; Type 0: advance by 1
+CMP# 02     ; Type 2?
+BEQ  :ADVANCE_3     ; Type 2: advance by 3
+; Type 1/3: advance by 2
+JSR  :ADVANCE_OUTPUT
+ADVANCE_1:
+JSR  :ADVANCE_OUTPUT
 JMP  :MAIN_LOOP   ; Jump to main loop
 
-@0F40       ; Type 0 handler: write 3 NOPs
-WRITE_NOPS:
-LDA# EA     ; NOP opcode
-STIY 02     ; Write first NOP
-INY         ; Next position
-STIY 02     ; Write second NOP
-INY         ; Next position
-STIY 02     ; Write third NOP
-INY         ; Next position
-; Advance output pointer by 4
-JSR  :ADVANCE_OUTPUT_4
+ADVANCE_3:
+JSR  :ADVANCE_OUTPUT
+JSR  :ADVANCE_OUTPUT
+JSR  :ADVANCE_OUTPUT
 JMP  :MAIN_LOOP   ; Jump to main loop
 
 @0F80       ; Align data section

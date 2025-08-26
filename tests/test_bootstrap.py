@@ -50,11 +50,8 @@ class TestBootstrap:
         assert result == "TRAP", f"Should have trapped at $8000, got {result}"
 
         # Check that assembler successfully completed and wrote BRK instruction
-        # BRK instruction should be at $8000: 00 EA EA EA (BRK + 3 NOPs)
+        # BRK instruction should be at $8000: 00 (native 6502 format)
         assert cpu.memory[0x8000] == 0x00, f"Expected BRK opcode (00) at $8000, got ${cpu.memory[0x8000]:02X}"
-        assert cpu.memory[0x8001] == 0xEA, f"Expected NOP (EA) at $8001, got ${cpu.memory[0x8001]:02X}"
-        assert cpu.memory[0x8002] == 0xEA, f"Expected NOP (EA) at $8002, got ${cpu.memory[0x8002]:02X}"
-        assert cpu.memory[0x8003] == 0xEA, f"Expected NOP (EA) at $8003, got ${cpu.memory[0x8003]:02X}"
         assert cpu.pc == 0x8000, f"Should have jumped to assembled code at $8000, PC=${cpu.pc:04X}"
 
     def test_bootstrap_integration(self, cpu, assembler_binary):

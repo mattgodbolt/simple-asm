@@ -123,8 +123,36 @@ def format_instruction(opcode: str, operand: str) -> str:
         return opcode
 
 
+def get_instruction_size(opcode: str, operand: str) -> int:
+    """Calculate native 6502 instruction size in bytes"""
+    opcode = opcode.strip()
+
+    # Instructions with no operand (1 byte)
+    no_operand_ops = {"BRK", "CLC", "ASL", "INY", "RTS", "END"}
+    if opcode in no_operand_ops:
+        return 1
+
+    # Branch instructions (2 bytes: opcode + offset)
+    branch_ops = {"BNE", "BEQ", "BCC", "BCS"}
+    if opcode in branch_ops:
+        return 2
+
+    # Instructions with single byte operand (2 bytes)
+    single_byte_ops = {"LDA#", "STAZ", "INCZ", "LDAZ", "CMP#", "STIY", "ADC#", "CPY#", "LDY#", "ORAZ", "SBC#", "LDAY"}
+    if opcode in single_byte_ops:
+        return 2
+
+    # Instructions with address operand (3 bytes)
+    address_ops = {"JMP", "JSR", "STAY", "CMPY"}
+    if opcode in address_ops:
+        return 3
+
+    # Default to 2 bytes if unknown
+    return 2
+
+
 def resolve_branch_offset(from_address: int, to_address: int) -> str:
-    """Convert address difference to instruction count format for consistency"""
+    """Convert address difference to native 6502 branch offset"""
     # 6502 branch is relative to PC after the 2-byte branch instruction
     pc_after_branch = from_address + 2  # 6502 PC after branch instruction
     offset_bytes = to_address - pc_after_branch
@@ -133,31 +161,12 @@ def resolve_branch_offset(from_address: int, to_address: int) -> str:
     if offset_bytes > 127 or offset_bytes < -128:
         raise ValueError(f"Branch target too far: {offset_bytes} bytes")
 
-    # Convert from 6502 offset back to instruction count format
-    # Formula: 6502_offset = instruction_count * 4 + 2
-    # Reverse: instruction_count = (6502_offset - 2) / 4
-    if offset_bytes >= 2:
-        # Forward branch - subtract 2 and divide by 4
-        instruction_count = (offset_bytes - 2) // 4
-        if (offset_bytes - 2) % 4 != 0:
-            raise ValueError(f"Branch offset {offset_bytes} doesn't align to 4-byte instructions")
-        return f"{instruction_count:02X}"
-    else:
-        # Backward branch or short forward - need to handle carefully
-        # For backward: offset_bytes is negative, so we need two's complement
-        if offset_bytes < 0:
-            # Two's complement, then apply reverse formula
-            positive_offset = 256 + offset_bytes  # Convert from two's complement
-            instruction_count = (positive_offset - 2) // 4
-            if (positive_offset - 2) % 4 != 0:
-                raise ValueError(f"Branch offset {offset_bytes} doesn't align to 4-byte instructions")
-            # Convert back to two's complement instruction count
-            if instruction_count > 127:
-                instruction_count = instruction_count - 256
-            return f"{instruction_count & 0xFF:02X}"
-        else:
-            # offset_bytes is 0 or 1 - these are too small for our formula
-            raise ValueError(f"Branch offset {offset_bytes} too small for instruction count format")
+    # Use native 6502 branch offset (signed byte)
+    if offset_bytes < 0:
+        # Negative offset - convert to unsigned byte representation
+        offset_bytes = 256 + offset_bytes
+
+    return f"{offset_bytes:02X}"
 
 
 def convert_to_punch_format(source_lines: list[str]) -> list[str]:
@@ -185,7 +194,7 @@ def convert_to_punch_format(source_lines: list[str]) -> list[str]:
                     parsed_lines.append((opcode, operand, line_no))
                     # Advance effective address for instructions (not directives)
                     if opcode not in ["DATA"]:  # DATA includes !, @, #, " directives
-                        effective_address += 4
+                        effective_address += get_instruction_size(opcode, operand)
         except ValueError as e:
             raise ValueError(f"Line {line_no}: {e}") from e
 
@@ -212,13 +221,13 @@ def convert_to_punch_format(source_lines: list[str]) -> list[str]:
                 offset = resolve_branch_offset(current_address, target_address)
                 instruction = format_instruction(opcode, offset)
                 punch_instructions.append(instruction)
-                current_address += 4
+                current_address += get_instruction_size(opcode, operand)
             elif opcode in branch_ops:
                 # Regular branch with hex operand
                 operand = normalize_operand(operand)
                 instruction = format_instruction(opcode, operand)
                 punch_instructions.append(instruction)
-                current_address += 4
+                current_address += get_instruction_size(opcode, operand)
             elif opcode.strip() in {"JMP", "JSR"} and operand.startswith(":"):
                 # Resolve JMP/JSR to label (operand has : prefix)
                 label_name = operand[1:]  # Strip : prefix
@@ -229,13 +238,13 @@ def convert_to_punch_format(source_lines: list[str]) -> list[str]:
                 hex_address = f"{address:04X}"
                 instruction = format_instruction(opcode, hex_address)
                 punch_instructions.append(instruction)
-                current_address += 4
+                current_address += get_instruction_size(opcode, operand)
             elif opcode.strip() in {"JMP", "JSR"}:
                 # Regular JMP/JSR with address operand
                 operand = normalize_operand(operand)
                 instruction = format_instruction(opcode, operand)
                 punch_instructions.append(instruction)
-                current_address += 4
+                current_address += get_instruction_size(opcode, operand)
             else:
                 # Regular instruction - normalize operand if it's not a label reference
                 if operand and not operand.startswith(":"):
@@ -244,7 +253,7 @@ def convert_to_punch_format(source_lines: list[str]) -> list[str]:
                 punch_instructions.append(instruction)
                 # Advance address for instructions (not data directives)
                 if opcode not in ["DATA"]:
-                    current_address += 4
+                    current_address += get_instruction_size(opcode, operand)
         except ValueError as e:
             raise ValueError(f"Line {line_no}: {e}") from e
 

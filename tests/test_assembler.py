@@ -36,10 +36,10 @@ class TestAssembler:
             with open(bin_path, "rb") as bf:
                 data = bf.read()
 
-            # Should contain: LDA#42 (A9 42 EA EA) + "HELLO" (48 45 4C 4C 4F) + BRK (00 EA EA EA)
-            assert data[0:4] == bytes([0xA9, 0x42, 0xEA, 0xEA])  # LDA #42
-            assert data[4:9] == b"HELLO"  # String data
-            assert data[9:13] == bytes([0x00, 0xEA, 0xEA, 0xEA])  # BRK
+            # Should contain: LDA#42 (A9 42) + "HELLO" (48 45 4C 4C 4F) + BRK (00)
+            assert data[0:2] == bytes([0xA9, 0x42])  # LDA #42
+            assert data[2:7] == b"HELLO"  # String data
+            assert data[7:8] == bytes([0x00])  # BRK
 
             # Cleanup
             Path(f.name).unlink()
@@ -67,9 +67,9 @@ class TestAssembler:
                 data = bf.read()
 
             # Should contain: LDA#42 + hex data + BRK
-            assert data[0:4] == bytes([0xA9, 0x42, 0xEA, 0xEA])  # LDA #42
-            assert data[4:8] == bytes([0xDE, 0xAD, 0xBE, 0xEF])  # Hex data
-            assert data[8:12] == bytes([0x00, 0xEA, 0xEA, 0xEA])  # BRK
+            assert data[0:2] == bytes([0xA9, 0x42])  # LDA #42
+            assert data[2:6] == bytes([0xDE, 0xAD, 0xBE, 0xEF])  # Hex data
+            assert data[6:7] == bytes([0x00])  # BRK
 
             # Cleanup
             Path(f.name).unlink()
@@ -99,8 +99,8 @@ class TestAssembler:
 
             # Data should start at offset 0x8300, first 0x300 bytes should be zeros
             assert data[0:0x300] == bytes(0x300)  # Zeros
-            assert data[0x300:0x304] == bytes([0xA9, 0x42, 0xEA, 0xEA])  # LDA #42 at $8300
-            assert data[0x304:0x308] == bytes([0x00, 0xEA, 0xEA, 0xEA])  # BRK
+            assert data[0x300:0x302] == bytes([0xA9, 0x42])  # LDA #42 at $8300
+            assert data[0x302:0x303] == bytes([0x00])  # BRK
 
             # Cleanup
             Path(f.name).unlink()

@@ -221,10 +221,8 @@ class SimpleAssembler:
                         operand_low = self._calculate_branch_offset(target)
                         operand_high = 0
                     else:
-                        # Numeric operand - instruction count format
-                        # Formula: 6502_offset = instruction_count * 4 + 2
-                        instruction_count = self._read_hex_byte()
-                        operand_low = (instruction_count * 4 + 2) & 0xFF
+                        # Numeric operand - native 6502 offset
+                        operand_low = self._read_hex_byte()
                         operand_high = 0
                 else:
                     raise ValueError(f"Invalid operand type: {operand_type}")
@@ -232,19 +230,19 @@ class SimpleAssembler:
                 # Skip any trailing whitespace after operand
                 self._skip_spaces()
 
-                # Generate 4-byte instruction
-                instruction = [opcode_byte, operand_low, operand_high, 0xEA]
-
-                # Adjust based on operand type
-                if operand_type == 0:  # No operand - pad with NOPs
-                    instruction = [opcode_byte, 0xEA, 0xEA, 0xEA]
+                # Generate instruction with native 6502 sizes
+                if operand_type == 0:  # No operand
+                    instruction = [opcode_byte]
                 elif operand_type == 1 or operand_type == 3:  # Single byte operand (including branches)
-                    instruction = [opcode_byte, operand_low, 0xEA, 0xEA]
-                # Type 2 uses the default format above (2-byte operand)
+                    instruction = [opcode_byte, operand_low]
+                elif operand_type == 2:  # Two byte operand
+                    instruction = [opcode_byte, operand_low, operand_high]
+                else:
+                    raise ValueError(f"Invalid operand type: {operand_type}")
 
                 output.extend(instruction)
-                # Update effective PC (each instruction is 4 bytes)
-                self.effective_pc += 4
+                # Update effective PC by actual instruction size
+                self.effective_pc += len(instruction)
 
         return bytes(output)
 
@@ -391,8 +389,17 @@ class SimpleAssembler:
                 # Skip operand reading in first pass
                 self._skip_operand(operand_type)
 
-                # Each instruction is 4 bytes
-                self.effective_pc += 4
+                # Update effective PC by actual instruction size
+                if operand_type == 0:  # No operand
+                    instruction_size = 1
+                elif operand_type == 1 or operand_type == 3:  # Single byte operand (including branches)
+                    instruction_size = 2
+                elif operand_type == 2:  # Two byte operand
+                    instruction_size = 3
+                else:
+                    raise ValueError(f"Invalid operand type: {operand_type}")
+
+                self.effective_pc += instruction_size
 
         # Restore original state
         self.source_ptr = save_source_ptr
