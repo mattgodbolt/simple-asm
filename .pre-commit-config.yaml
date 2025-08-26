@@ -39,3 +39,10 @@ repos:
         types_or: [python]
         pass_filenames: false
         require_serial: true
+      - id: test-bootstrap
+        name: Test bootstrap (assembler self-assembly)
+        entry: make test-bootstrap
+        language: system
+        types_or: [python]
+        pass_filenames: false
+        require_serial: true
