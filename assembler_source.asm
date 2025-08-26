@@ -16,28 +16,33 @@ STAZ 02     ; Store to zero page $02
 LDA# 80
 STAZ 03     ; Store to zero page $03
 
-@0220       ; Align main loop to clean address with room for growth
+; Initialize effective PC to $8000 (same as output initially)
+LDA# 00
+STAZ 10     ; Store to zero page $10 (effective PC low)
+LDA# 80
+STAZ 11     ; Store to zero page $11 (effective PC high)
+
+JMP  :MAIN_LOOP   ; Jump to main loop
+
+@0240       ; Align main loop to clean address with room for growth
 ; Main assembly loop
 ; Read 4-character opcode into buffer at $05-$08
 MAIN_LOOP:
 LDY# 00     ; Reset Y to 0
 LDAY 00     ; Peek at first character
+CMP# 21     ; Is it '!' ($21)?
+BNE  01     ; Not !, skip next instruction
+JMP  :HANDLE_EXCLAMATION
 CMP# 40     ; Is it '@' ($40)?
-BEQ  05     ; Yes, handle @ directive
+BNE  01     ; Not @, skip next instruction
+JMP  :HANDLE_AT
 CMP# 23     ; Is it '#' ($23)?
-BEQ  04     ; Yes, handle hex data
+BNE  01     ; Not #, skip next instruction
+JMP  :HANDLE_HASH
 CMP# 22     ; Is it '"' ($22)?
-BEQ  03     ; Yes, handle string data
-JMP  0280   ; No, handle as opcode (CHAR_HANDLER)
-
-; Handle @ directive - jump to handler
-JMP  1200   ; @ directive handler (HANDLE_AT)
-
-; Handle # hex data - jump to handler
-JMP  1280   ; # hex data handler (HANDLE_HASH)
-
-; Handle " string data - jump to handler
-JMP  1300   ; " string data handler (HANDLE_STRING)
+BNE  01     ; Not ", skip next instruction
+JMP  :HANDLE_STRING
+JMP  :CHAR_HANDLER   ; None of the above, handle as opcode
 
 @0280       ; Align SKIP_SPACES routine
 ; Skip spaces and newlines then read 4-character opcode
@@ -45,17 +50,18 @@ CHAR_HANDLER:
 LDY# 00     ; Reset Y to 0
 LDAY 00     ; Read current char
 CMP# 20     ; Is it space?
-BEQ  06     ; Yes, advance pointer
+BEQ  :SKIP_ADVANCE   ; Yes, advance pointer
 CMP# 0A     ; Is it newline?
-BNE  07     ; No, start reading opcode
+BNE  :READ_OPCODE   ; No, start reading opcode
+SKIP_ADVANCE:
 ; Advance source pointer by 1
 CLC
 LDAZ 00
 ADC# 01
 STAZ 00
-BCC  F6     ; Loop back to SKIP_SPACES
+BCC  :CHAR_HANDLER   ; Loop back
 INCZ 01
-JMP  0280   ; Jump back to CHAR_HANDLER
+JMP  :CHAR_HANDLER   ; Jump back
 
 ; Read 4 characters into buffer
 READ_OPCODE:
@@ -65,7 +71,7 @@ LDAY 00     ; Read from (source),Y
 STAY 0005   ; Store to buffer at $0005,Y
 INY         ; Next character
 CPY# 04     ; Read 4 chars?
-BNE  FB     ; Loop back to read next char
+BNE  :READ_CHAR   ; Loop back to read next char
 
 ; Advance source pointer by 4
 CLC
@@ -74,7 +80,7 @@ ADC# 04
 STAZ 00
 BCC  01     ; Skip if no carry
 INCZ 01     ; Increment high byte
-JMP  0300   ; Jump to table lookup (LOOKUP_TABLE)
+JMP  :LOOKUP_TABLE   ; Jump to table lookup
 
 @0300       ; Align table lookup section with room for expansion
 ; Look up opcode in table at $0500
@@ -90,10 +96,10 @@ LDY# 00     ; Reset comparison index
 COMPARE_CHARS:
 LDAY 0E     ; Get table character
 CMPY 0005   ; Compare with buffer char at $0005,Y
-BNE  0A     ; No match, try next entry
+BNE  :NEXT_ENTRY   ; No match, try next entry
 INY         ; Next character
 CPY# 04     ; All 4 chars checked?
-BNE  FA     ; Loop back to COMPARE_CHARS
+BNE  :COMPARE_CHARS   ; Loop back to COMPARE_CHARS
 
 ; Found match! Extract opcode and type
 LDY# 04     ; Point to opcode byte
@@ -106,9 +112,9 @@ STAZ 0C     ; Store type
 LDY# 00     ; Reset Y to 0
 LDAY 00     ; Get character at source pointer
 CMP# 20     ; Is it a space?
-BNE  02     ; No, skip advance
+BNE  01     ; No, skip advance
 JSR  :ADVANCE_SOURCE   ; Yes, advance source pointer
-JMP  0400   ; Jump to READ_OPERAND
+JMP  :READ_OPERAND   ; Jump to READ_OPERAND
 
 ; No match - advance to next table entry
 NEXT_ENTRY:
@@ -122,21 +128,24 @@ INCZ 0F     ; Increment high byte
 ; Check for end of table
 LDAZ 0F
 CMP# 11     ; Past OPCODE_TABLE end?
-BCC  E9     ; No, continue TABLE_LOOP
+BCC  :TABLE_LOOP   ; No, continue TABLE_LOOP
 BRK         ; Error - opcode not found
 
 @0400       ; Align operand reading section
 ; Read operand based on type in $0C
 READ_OPERAND:
 LDAZ 0C     ; Get operand type
-BNE  04     ; Not 0, check other types
-JMP  0E00   ; Type 0: jump to WRITE_INST
+BNE  :CHECK_TYPE_1   ; Not 0, check other types
+JMP  :WRITE_INST   ; Type 0: jump to WRITE_INST
+CHECK_TYPE_1:
 CMP# 01     ; Type 1: single byte
-BNE  04     ; Not 1, check type 2
-JMP  0500   ; Type 1: jump to READ_BYTE
+BNE  :CHECK_TYPE_2   ; Not 1, check type 2
+JMP  :READ_BYTE   ; Type 1: jump to READ_BYTE
+CHECK_TYPE_2:
 CMP# 02     ; Type 2: two bytes
-BNE  04     ; Not 2, must be type 3
-JMP  0540   ; Type 2: jump to READ_WORD
+BNE  :TYPE_3_BRANCH   ; Not 2, must be type 3
+JMP  :READ_WORD   ; Type 2: jump to READ_WORD
+TYPE_3_BRANCH:
 ; Must be type 3: branch
 JSR  :READ_BYTE   ; Call READ_BYTE
 ; Multiply by 4 for branch offset and add 2
@@ -146,7 +155,7 @@ ASL         ; Shift left (×4)
 CLC         ; Clear carry
 ADC# 02     ; Add 2 to compensate for PC offset
 STAZ 09     ; Store result
-JMP  0E00   ; Jump to WRITE_INST
+JMP  :WRITE_INST   ; Jump to WRITE_INST
 
 @0500       ; Align READ_BYTE routine
 ; Read single byte operand
@@ -155,7 +164,7 @@ JSR  :HEX_TO_BYTE   ; Call hex conversion
 STAZ 09     ; Store low byte
 LDA# 00
 STAZ 0A     ; Clear high byte
-JMP  0E00   ; Jump to WRITE_INST
+JMP  :WRITE_INST   ; Jump to WRITE_INST
 
 @0540       ; Align READ_WORD routine
 ; Read two-byte operand (little-endian)
@@ -164,7 +173,7 @@ JSR  :HEX_TO_BYTE   ; Call hex conversion
 STAZ 0A     ; Store as high byte
 JSR  :HEX_TO_BYTE   ; Call hex conversion again
 STAZ 09     ; Store as low byte
-JMP  0E00   ; Jump to WRITE_INST
+JMP  :WRITE_INST   ; Jump to WRITE_INST
 
 @0580       ; Align HEX_TO_BYTE routine
 ; Convert 2 hex digits to byte in A
@@ -222,9 +231,9 @@ INY         ; Next position
 ; Write operand bytes or NOPs based on type
 LDAZ 0C     ; Get operand type
 BEQ  02     ; Type 0: write 3 NOPs
-JMP  0F40   ; Jump to type 0 handler (WRITE_NOPS)
+JMP  :WRITE_NOPS   ; Jump to type 0 handler
 CMP# 01     ; Type 1: write byte + 2 NOPs
-BEQ  06     ; Yes, goto WRITE_BYTE
+BEQ  :WRITE_BYTE   ; Yes, goto WRITE_BYTE
 ; Type 2 or 3: write 2 bytes + 1 NOP
 LDAZ 09     ; Get low byte
 STIY 02     ; Write it
@@ -232,16 +241,16 @@ INY         ; Next position
 LDAZ 0A     ; Get high byte
 STIY 02     ; Write it
 INY         ; Next position
-JMP  0F00   ; Jump to write final NOP (PAD_INST)
+JMP  :PAD_INST   ; Jump to write final NOP
 
-; WRITE_BYTE:
+WRITE_BYTE:
 LDAZ 09     ; Get operand byte
 STIY 02     ; Write it
 INY         ; Next position
 LDA# EA     ; NOP opcode
 STIY 02     ; Write NOP
 INY         ; Next position
-JMP  0F00   ; Jump to write final NOP (PAD_INST)
+JMP  :PAD_INST   ; Jump to write final NOP
 
 @0F00       ; Align final NOP writing section
 PAD_INST:
@@ -254,7 +263,7 @@ ADC# 04     ; Add 4
 STAZ 02
 BCC  01     ; Skip if no carry
 INCZ 03     ; Increment high byte
-JMP  0F80   ; Jump to end check (CHECK_END)
+JMP  :CHECK_END   ; Jump to end check
 
 @0F40       ; Type 0 handler: write 3 NOPs
 WRITE_NOPS:
@@ -274,7 +283,7 @@ ADC# 04     ; Add 4
 STAZ 02
 BCC  01     ; Skip if no carry
 INCZ 03     ; Increment high byte
-JMP  0F80   ; Jump to end check (CHECK_END)
+JMP  :CHECK_END   ; Jump to end check
 
 @0F80       ; Align end check section
 ; Check for END marker (special opcode $FF)
@@ -282,7 +291,7 @@ CHECK_END:
 LDAZ 0B     ; Get opcode
 CMP# FF     ; Is it END marker?
 BEQ  02     ; Yes, jump to assembled code
-JMP  0220   ; No, continue assembly (MAIN_LOOP)
+JMP  :MAIN_LOOP   ; No, continue assembly
 
 ; Done! Jump to assembled program
 JMP  8000   ; Jump to assembled code at $8000
@@ -421,17 +430,10 @@ JMP  8000   ; Jump to assembled code at $8000
 #E9
 #01
 
-@1100       ; Gap filling routine - simplified approach
-; Just copy target address to output pointer (skip actual filling for now)
-SET_OUTPUT_PTR:
-LDAZ 0A     ; Target low
-STAZ 02     ; Set output pointer low
-LDAZ 0B     ; Target high
-STAZ 03     ; Set output pointer high
-RTS         ; Return
+@1100       ; Reserved for future use
 
 @1200       ; @ directive handler
-; Handle @xxxx - set effective address and fill gap
+; Handle @xxxx - advance effective PC and output pointer
 HANDLE_AT:
 ; Advance source pointer by 1 (skip '@')
 CLC
@@ -441,27 +443,30 @@ STAZ 00
 BCC  01
 INCZ 01
 
-; Read 4 hex digits for address
+; Read 4 hex digits for target effective address
 JSR  :HEX_TO_BYTE   ; Read first byte (high)
 STAZ 06     ; Store high byte
 JSR  :HEX_TO_BYTE   ; Read second byte (low)
 STAZ 07     ; Store low byte
 
-; Calculate target address: $8000 + directive value
-; Directive value is in $06 (high) and $07 (low)
-; Target = $8000 + ($06 << 8) + $07
+; Calculate target output address
+; If !0000 was used, we're assembling at $8000 but code thinks it's at $0000
+; So @0200 means advance to output $8200 (which is $8000 + $0200)
 CLC
-LDAZ 07     ; Get low byte of directive
-ADC# 00     ; Add base address low ($8000 & $FF = $00)
-STAZ 0A     ; Store target low byte
-LDAZ 06     ; Get high byte of directive
-ADC# 80     ; Add base address high ($8000 >> 8 = $80)
-STAZ 0B     ; Store target high byte
+LDAZ 07     ; Get low byte of target effective
+ADC# 00     ; Add output base low ($8000 & $FF = $00)
+STAZ 02     ; Update output pointer low directly
+LDAZ 06     ; Get high byte of target effective
+ADC# 80     ; Add output base high ($8000 >> 8 = $80)
+STAZ 03     ; Update output pointer high directly
 
-; Fill gap with zeros from current output to target
-; Current output is at ($02/$03), target at ($0A/$0B)
-JSR  :SET_OUTPUT_PTR   ; Call gap filling routine
-JMP  0220   ; Back to main loop (MAIN_LOOP)
+; Update effective PC to target
+LDAZ 07
+STAZ 10     ; Update effective PC low
+LDAZ 06
+STAZ 11     ; Update effective PC high
+
+JMP  :MAIN_LOOP   ; Back to main loop
 
 @1280       ; # hex data handler
 ; Handle #xx - read hex byte and write to output
@@ -486,7 +491,7 @@ ADC# 01
 STAZ 02
 BCC  01
 INCZ 03
-JMP  0220   ; Back to main loop
+JMP  :MAIN_LOOP   ; Back to main loop
 
 @1300       ; " string data handler
 ; Handle "text" - read string until closing quote and write to output
@@ -498,7 +503,7 @@ ADC# 01
 STAZ 00
 BCC  01
 INCZ 01
-JMP  1320   ; Jump to STRING_LOOP
+JMP  :STRING_LOOP   ; Jump to STRING_LOOP
 
 @1320       ; Align STRING_LOOP routine
 ; Read characters until closing quote
@@ -506,7 +511,7 @@ STRING_LOOP:
 LDY# 00     ; Reset Y to 0
 LDAY 00     ; Read character
 CMP# 22     ; Is it '"'?
-BEQ  0A     ; Yes, done with string
+BEQ  :STRING_DONE   ; Yes, done with string
 
 ; Write character to output
 LDY# 00
@@ -518,13 +523,45 @@ CLC         ; Advance output pointer
 LDAZ 02
 ADC# 01
 STAZ 02
-BCC  FA     ; Loop back to STRING_LOOP
+BCC  :STRING_LOOP   ; Loop back to STRING_LOOP
 INCZ 03
-JMP  1320   ; Jump back to STRING_LOOP
+JMP  :STRING_LOOP   ; Jump back to STRING_LOOP
 
+STRING_DONE:
 ; Done with string - advance past closing quote
 JSR  :ADVANCE_SOURCE   ; Advance source pointer
-JMP  0220   ; Back to main loop
+JMP  :MAIN_LOOP   ; Back to main loop
+
+@1380       ; ! directive handler
+; Handle !xxxx - set effective address (for relocation)
+HANDLE_EXCLAMATION:
+; Advance source pointer by 1 (skip '!')
+CLC
+LDAZ 00
+ADC# 01
+STAZ 00
+BCC  01
+INCZ 01
+
+; Read 4 hex digits for new effective address
+JSR  :HEX_TO_BYTE   ; Read first byte (high)
+STAZ 06     ; Store high byte
+JSR  :HEX_TO_BYTE   ; Read second byte (low)
+STAZ 07     ; Store low byte
+
+; Set effective address directly (! sets where code thinks it's running)
+; Effective address is in $06 (high) and $07 (low)
+; This is used for relocation - code may be stored at $8000 but run at $0000
+; Unlike @, this doesn't change the output pointer, only the effective PC
+LDAZ 07     ; Get low byte of directive
+STAZ 10     ; Store as effective PC low (using $10-11 for effective PC)
+LDAZ 06     ; Get high byte of directive
+STAZ 11     ; Store as effective PC high
+
+; Note: We need to track effective PC separately from output pointer
+; Output pointer ($02-03) is where we write
+; Effective PC ($10-11) is what address the code thinks it's at
+JMP  :MAIN_LOOP   ; Back to main loop
 
 ; End of assembler program
 END

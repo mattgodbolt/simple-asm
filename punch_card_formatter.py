@@ -123,21 +123,25 @@ def format_instruction(opcode: str, operand: str) -> str:
         return opcode
 
 
-def resolve_branch_offset(from_instruction: int, to_instruction: int) -> str:
-    """Convert instruction index difference to branch offset hex"""
-    offset = to_instruction - from_instruction - 1  # -1 because branch is relative to next instruction
+def resolve_branch_offset(from_address: int, to_address: int) -> str:
+    """Convert address difference to branch offset hex for 6502"""
+    # 6502 branch is relative to PC after the 2-byte branch instruction
+    # But we're working with 4-byte instructions, so we need to account for this
+    pc_after_branch = from_address + 2  # 6502 PC after branch instruction
+    offset_bytes = to_address - pc_after_branch
 
-    # Convert to hex offset for our 4-byte instruction format
-    if offset >= 0:
-        # Forward branch: convert to hex
-        if offset > 127:  # Max forward branch in 6502
-            raise ValueError(f"Forward branch too far: {offset} instructions")
-        return f"{offset:02X}"
+    # Validate 6502 branch limits
+    if offset_bytes >= 0:
+        # Forward branch
+        if offset_bytes > 127:  # Max forward branch in 6502
+            raise ValueError(f"Forward branch too far: {offset_bytes} bytes")
+        return f"{offset_bytes:02X}"
     else:
-        # Backward branch: convert to two's complement
-        if offset < -128:  # Max backward branch in 6502
-            raise ValueError(f"Backward branch too far: {offset} instructions")
-        hex_offset = (256 + offset) & 0xFF
+        # Backward branch
+        if offset_bytes < -128:  # Max backward branch in 6502
+            raise ValueError(f"Backward branch too far: {offset_bytes} bytes")
+        # Two's complement
+        hex_offset = (256 + offset_bytes) & 0xFF
         return f"{hex_offset:02X}"
 
 
@@ -146,7 +150,7 @@ def convert_to_punch_format(source_lines: list[str]) -> list[str]:
     # First pass: parse all lines and collect labels with their effective addresses
     parsed_lines: list[tuple[str, str, int]] = []
     labels = {}  # label_name -> effective_address
-    effective_address = 0  # Track current effective address
+    effective_address = 0x8000  # Track current effective address
 
     for line_no, line in enumerate(source_lines, 1):
         try:
@@ -173,26 +177,33 @@ def convert_to_punch_format(source_lines: list[str]) -> list[str]:
     # Second pass: resolve branches and format instructions
     punch_instructions = []
     branch_ops = {"BEQ ", "BNE ", "BCC ", "BCS ", "BMI ", "BPL ", "BVC ", "BVS "}
+    current_address = 0x8000  # Track current address during second pass
 
-    for inst_index, (opcode, operand, line_no) in enumerate(parsed_lines):
+    for opcode, operand, line_no in parsed_lines:
         try:
             if opcode == "DATA":
-                # Data lines pass through unchanged
+                # Handle data directives
+                if operand.startswith("@"):
+                    # Address directive - update current address
+                    hex_part = operand[1:]  # Remove @
+                    current_address = int(hex_part, 16)
                 punch_instructions.append(operand)
             elif opcode in branch_ops and operand.startswith(":"):
                 # Resolve branch to label (operand has : prefix)
                 label_name = operand[1:]  # Strip : prefix
                 if label_name not in labels:
                     raise ValueError(f"Undefined label: {label_name}")
-                target_index = labels[label_name]
-                offset = resolve_branch_offset(inst_index, target_index)
+                target_address = labels[label_name]
+                offset = resolve_branch_offset(current_address, target_address)
                 instruction = format_instruction(opcode, offset)
                 punch_instructions.append(instruction)
+                current_address += 4
             elif opcode in branch_ops:
                 # Regular branch with hex operand
                 operand = normalize_operand(operand)
                 instruction = format_instruction(opcode, operand)
                 punch_instructions.append(instruction)
+                current_address += 4
             elif opcode.strip() in {"JMP", "JSR"} and operand.startswith(":"):
                 # Resolve JMP/JSR to label (operand has : prefix)
                 label_name = operand[1:]  # Strip : prefix
@@ -203,17 +214,22 @@ def convert_to_punch_format(source_lines: list[str]) -> list[str]:
                 hex_address = f"{address:04X}"
                 instruction = format_instruction(opcode, hex_address)
                 punch_instructions.append(instruction)
+                current_address += 4
             elif opcode.strip() in {"JMP", "JSR"}:
                 # Regular JMP/JSR with address operand
                 operand = normalize_operand(operand)
                 instruction = format_instruction(opcode, operand)
                 punch_instructions.append(instruction)
+                current_address += 4
             else:
                 # Regular instruction - normalize operand if it's not a label reference
                 if operand and not operand.startswith(":"):
                     operand = normalize_operand(operand)
                 instruction = format_instruction(opcode, operand)
                 punch_instructions.append(instruction)
+                # Advance address for instructions (not data directives)
+                if opcode not in ["DATA"]:
+                    current_address += 4
         except ValueError as e:
             raise ValueError(f"Line {line_no}: {e}") from e
 

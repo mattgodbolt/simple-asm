@@ -211,13 +211,28 @@ class SimpleAssembler:
                     operand_low = operand_value & 0xFF
                     operand_high = (operand_value >> 8) & 0xFF
                 elif operand_type == 3:  # Branch offset
-                    offset = self._read_hex_byte()
-                    # Convert signed byte to branch offset
-                    if offset > 127:
-                        offset = offset - 256
-                    # Adjust for PC being at +2 (not +4) after branch instruction
-                    operand_low = (offset * 4 + 2) & 0xFF
-                    operand_high = 0
+                    # Check if it's a label reference
+                    self._skip_spaces()
+                    if self.memory.read_byte(self.source_ptr) == ord(":"):
+                        self.source_ptr += 1  # Skip the ':'
+                        label_name = self._read_word()
+                        if label_name not in self.labels:
+                            raise ValueError(f"Unknown label: {label_name}")
+                        # Calculate branch offset from current PC to label
+                        target = self.labels[label_name]
+                        # 6502 branch is relative to PC after the 2-byte branch instruction
+                        pc_after_branch = self.effective_pc + 2
+                        offset_bytes = target - pc_after_branch
+                        # Validate 6502 branch limits
+                        if offset_bytes > 127 or offset_bytes < -128:
+                            raise ValueError(f"Branch to {label_name} too far: {offset_bytes} bytes")
+                        operand_low = offset_bytes & 0xFF
+                        operand_high = 0
+                    else:
+                        # Regular hex offset (already a 6502 branch offset)
+                        offset = self._read_hex_byte()
+                        operand_low = offset
+                        operand_high = 0
                 else:
                     raise ValueError(f"Invalid operand type: {operand_type}")
 
@@ -435,7 +450,13 @@ class SimpleAssembler:
         elif operand_type == 2:  # Two bytes
             self._skip_operand_value()
         elif operand_type == 3:  # Branch offset
-            self._skip_hex_byte()
+            # Skip branch operand (hex or label)
+            self._skip_spaces()
+            if self.memory.read_byte(self.source_ptr) == ord(":"):
+                self.source_ptr += 1  # Skip ':'
+                self._read_word()  # Skip label name
+            else:
+                self._skip_hex_byte()
 
     def _skip_hex_byte(self):
         """Skip hex byte reading"""
