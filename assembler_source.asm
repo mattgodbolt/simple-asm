@@ -62,12 +62,7 @@ CMP# 0A     ; Is it newline?
 BNE  :READ_OPCODE   ; No, start reading opcode
 SKIP_ADVANCE:
 ; Advance source pointer by 1
-CLC
-LDAZ 00
-ADC# 01
-STAZ 00
-BCC  :MAIN_LOOP   ; Loop back to check for special chars
-INCZ 01
+JSR  :ADVANCE_SOURCE
 JMP  :MAIN_LOOP   ; Jump back to check for special chars
 
 ; Read 4 characters into buffer
@@ -81,12 +76,7 @@ CPY# 04     ; Read 4 chars?
 BNE  :READ_CHAR   ; Loop back to read next char
 
 ; Advance source pointer by 4
-CLC
-LDAZ 00
-ADC# 04
-STAZ 00
-BCC  01     ; Skip if no carry
-INCZ 01     ; Increment high byte
+JSR  :ADVANCE_SOURCE_4
 JMP  :LOOKUP_TABLE   ; Jump to table lookup
 
 @0300       ; Align table lookup section with room for expansion
@@ -225,15 +215,45 @@ CLC         ; Clear carry for proper subtraction
 SBC# 36     ; Convert 'A'-'F' (subtract 'A'-10-1)
 RTS
 
-@0600       ; Align ADVANCE_SOURCE routine
+@0600       ; Align pointer advancement routines
 ; Advance source pointer by 1
 ADVANCE_SOURCE:
 CLC
 LDAZ 00
 ADC# 01
 STAZ 00
-BCC  01     ; Skip if no carry
-INCZ 01     ; Increment high byte
+BCC  01
+INCZ 01
+RTS
+
+; Advance source pointer by 4
+ADVANCE_SOURCE_4:
+CLC
+LDAZ 00
+ADC# 04
+STAZ 00
+BCC  01
+INCZ 01
+RTS
+
+; Advance output pointer by 1
+ADVANCE_OUTPUT:
+CLC
+LDAZ 02
+ADC# 01
+STAZ 02
+BCC  01
+INCZ 03
+RTS
+
+; Advance output pointer by 4
+ADVANCE_OUTPUT_4:
+CLC
+LDAZ 02
+ADC# 04
+STAZ 02
+BCC  01
+INCZ 03
 RTS
 
 @0E00       ; Align WRITE_INST routine
@@ -286,12 +306,7 @@ PAD_INST:
 LDA# EA     ; NOP opcode
 STIY 02     ; Write final NOP
 ; Advance output pointer by 4
-CLC
-LDAZ 02     ; Output pointer low
-ADC# 04     ; Add 4
-STAZ 02
-BCC  01     ; Skip if no carry
-INCZ 03     ; Increment high byte
+JSR  :ADVANCE_OUTPUT_4
 JMP  :MAIN_LOOP   ; Jump to main loop
 
 @0F40       ; Type 0 handler: write 3 NOPs
@@ -306,12 +321,7 @@ LDA# EA     ; NOP opcode
 STIY 02     ; Write third NOP
 INY         ; Next position
 ; Advance output pointer by 4
-CLC
-LDAZ 02     ; Output pointer low
-ADC# 04     ; Add 4
-STAZ 02
-BCC  01     ; Skip if no carry
-INCZ 03     ; Increment high byte
+JSR  :ADVANCE_OUTPUT_4
 JMP  :MAIN_LOOP   ; Jump to main loop
 
 @0F80       ; Align data section
@@ -457,12 +467,7 @@ JMP  :MAIN_LOOP   ; Jump to main loop
 ; Handle @xxxx - advance effective PC and output pointer
 HANDLE_AT:
 ; Advance source pointer by 1 (skip '@')
-CLC
-LDAZ 00
-ADC# 01
-STAZ 00
-BCC  01
-INCZ 01
+JSR  :ADVANCE_SOURCE
 
 ; Read 4 hex digits for target effective address
 JSR  :HEX_TO_BYTE   ; Read first byte (high)
@@ -495,12 +500,7 @@ JMP  :MAIN_LOOP   ; Back to main loop
 ; Handle #xx - read hex byte and write to output
 HANDLE_HASH:
 ; Advance source pointer by 1 (skip '#')
-CLC
-LDAZ 00
-ADC# 01
-STAZ 00
-BCC  01
-INCZ 01
+JSR  :ADVANCE_SOURCE
 
 ; Read hex byte and write to output
 JSR  :HEX_TO_BYTE   ; Read hex byte
@@ -508,24 +508,14 @@ LDY# 00
 STIY 02     ; Write to (output),Y
 
 ; Advance output pointer by 1
-CLC
-LDAZ 02
-ADC# 01
-STAZ 02
-BCC  01
-INCZ 03
+JSR  :ADVANCE_OUTPUT
 JMP  :MAIN_LOOP   ; Back to main loop
 
 @1300       ; " string data handler
 ; Handle "text" - read string until closing quote and write to output
 HANDLE_STRING:
 ; Advance source pointer by 1 (skip opening '"')
-CLC
-LDAZ 00
-ADC# 01
-STAZ 00
-BCC  01
-INCZ 01
+JSR  :ADVANCE_SOURCE
 JMP  :STRING_LOOP   ; Jump to STRING_LOOP
 
 @1320       ; Align STRING_LOOP routine
@@ -542,12 +532,7 @@ STIY 02     ; Write to (output),Y
 
 ; Advance both pointers
 JSR  :ADVANCE_SOURCE   ; Advance source pointer
-CLC         ; Advance output pointer
-LDAZ 02
-ADC# 01
-STAZ 02
-BCC  :STRING_LOOP   ; Loop back to STRING_LOOP
-INCZ 03
+JSR  :ADVANCE_OUTPUT
 JMP  :STRING_LOOP   ; Jump back to STRING_LOOP
 
 STRING_DONE:
@@ -559,12 +544,7 @@ JMP  :MAIN_LOOP   ; Back to main loop
 ; Handle !xxxx - set effective address (for relocation)
 HANDLE_EXCLAMATION:
 ; Advance source pointer by 1 (skip '!')
-CLC
-LDAZ 00
-ADC# 01
-STAZ 00
-BCC  01
-INCZ 01
+JSR  :ADVANCE_SOURCE
 
 ; Read 4 hex digits for new effective address
 JSR  :HEX_TO_BYTE   ; Read first byte (high)
