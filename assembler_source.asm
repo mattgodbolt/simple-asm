@@ -277,8 +277,7 @@ BCS  :HEX_LETTER ; Yes, handle A-F
 SBC# 2F     ; Convert '0'-'9' (subtract '0'-1)
 RTS
 HEX_LETTER:
-CLC         ; Clear carry for proper subtraction
-SBC# 36     ; Convert 'A'-'F' (subtract 'A'-10-1)
+SBC# 37     ; Convert 'A'-'F' (carry already set from BCS)
 RTS
 
 ; Advance source pointer by 1
