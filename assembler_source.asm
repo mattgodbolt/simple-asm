@@ -223,11 +223,6 @@ BEQ  :READ_WORD   ; Type 2: jump to read_WORD
 ; Type 1 or 3: both read single byte
 JSR  :READ_BYTE   ; Call READ_BYTE
 JMP  :WRITE_INST   ; Jump to WRITE_INST
-JMP  :READ_WORD   ; Type 2: jump to READ_WORD
-TYPE_3_BRANCH:
-; Must be type 3: branch
-JSR  :READ_BYTE   ; Call READ_BYTE
-JMP  :WRITE_INST   ; Jump to WRITE_INST
 
 ; Read single byte operand
 READ_BYTE:
