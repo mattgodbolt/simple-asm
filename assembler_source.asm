@@ -111,8 +111,7 @@ HANDLE_HASH:
 JSR  :ADVANCE_SOURCE
 
 ; Read hex byte and write to output
-JSR  :HEX_TO_BYTE   ; Read hex byte
-LDY# 00
+JSR  :HEX_TO_BYTE   ; Read hex byte (returns with Y=0)
 STIY 02     ; Write to (output),Y
 
 ; Advance output pointer by 1
@@ -128,6 +127,7 @@ BNE  :SKIP_STRING     ; Not ", skip to next check
 HANDLE_STRING:
 ; Advance source pointer by 1 (skip opening '"')
 JSR  :ADVANCE_SOURCE
+LDY# 00     ; Set Y=0 for string processing
 JMP  :STRING_LOOP   ; Jump to STRING_LOOP
 
 SKIP_STRING:
@@ -501,8 +501,7 @@ JMP  :MAIN_LOOP   ; Jump to main loop
 @1100       ; STRING_LOOP moved here from $1320
 ; Read characters until closing quote
 STRING_LOOP:
-LDY# 00     ; Reset Y to 0
-LDAY 00     ; Read character
+LDAY 00     ; Read character (Y=0 from entry)
 CMP# 22     ; Is it '"'?
 BEQ  :STRING_DONE   ; Yes, done with string
 
