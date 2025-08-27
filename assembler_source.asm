@@ -41,26 +41,14 @@ BNE  :SKIP_EXCLAMATION     ; Not !, skip to next check
 
 ; Handler moved here from $1380 to be within branch range
 HANDLE_EXCLAMATION:
-; Advance source pointer by 1 (skip '!')
-JSR  :ADVANCE_SOURCE
-
-; Read 4 hex digits for new effective address
-JSR  :HEX_TO_BYTE   ; Read first byte (high)
-STAZ 06     ; Store high byte
-JSR  :HEX_TO_BYTE   ; Read second byte (low)
-STAZ 07     ; Store low byte
-
-; Set effective address directly (! sets where code thinks it's running)
-; Effective address is in $06 (high) and $07 (low)
-; This is used for relocation - code may be stored at $8000 but run at $0000
+; ! sets where code thinks it's running (relocation)
 ; Unlike @, this doesn't change the output pointer, only the effective PC
+JSR  :READ_DIRECTIVE_ADDR   ; Read address into $06/$07
+; Update effective PC
 LDAZ 07     ; Get low byte of directive
-STAZ 10     ; Store as effective PC low (using $10-11 for effective PC)
+STAZ 10     ; Store as effective PC low
 LDAZ 06     ; Get high byte of directive
 STAZ 11     ; Store as effective PC high
-
-; Skip newline after directive
-JSR  :ADVANCE_SOURCE
 JMP  :MAIN_LOOP   ; Back to main loop
 
 SKIP_EXCLAMATION:
@@ -70,14 +58,14 @@ BNE  :SKIP_AT     ; Not @, skip to next check
 
 ; Handler moved here from $1200 to be within branch range
 HANDLE_AT:
-; Advance source pointer by 1 (skip '@')
-JSR  :ADVANCE_SOURCE
+; Read directive address
+JSR  :READ_DIRECTIVE_ADDR
 
-; Read 4 hex digits for target effective address
-JSR  :HEX_TO_BYTE   ; Read first byte (high)
-STAZ 06     ; Store high byte
-JSR  :HEX_TO_BYTE   ; Read second byte (low)
-STAZ 07     ; Store low byte
+; Update effective PC
+LDAZ 07     ; Get low byte of directive
+STAZ 10     ; Store as effective PC low
+LDAZ 06     ; Get high byte of directive
+STAZ 11     ; Store as effective PC high
 
 ; Calculate target output address
 ; If !0000 was used, we're assembling at $8000 but code thinks it's at $0000
@@ -90,14 +78,6 @@ LDAZ 06     ; Get high byte of target effective
 ADC# 80     ; Add output base high ($8000 >> 8 = $80)
 STAZ 03     ; Update output pointer high directly
 
-; Update effective PC to target
-LDAZ 07
-STAZ 10     ; Update effective PC low
-LDAZ 06
-STAZ 11     ; Update effective PC high
-
-; Skip newline after directive
-JSR  :ADVANCE_SOURCE
 JMP  :MAIN_LOOP   ; Back to main loop
 
 SKIP_AT:
@@ -303,6 +283,22 @@ STAZ 00     ; Store back
 BCC  :SKIP_SOURCE_BY_4_INC  ; Skip if no carry
 INCZ 01     ; Increment high byte
 SKIP_SOURCE_BY_4_INC:
+RTS
+
+; Read directive address (4 hex digits) into $06-$07
+; Common subroutine for both ! and @ handlers
+READ_DIRECTIVE_ADDR:
+; Advance source pointer by 1 (skip directive character)
+JSR  :ADVANCE_SOURCE
+
+; Read 4 hex digits for new effective address
+JSR  :HEX_TO_BYTE   ; Read first byte (high)
+STAZ 06     ; Store high byte
+JSR  :HEX_TO_BYTE   ; Read second byte (low)
+STAZ 07     ; Store low byte
+
+; Skip newline after directive
+JSR  :ADVANCE_SOURCE
 RTS
 
 ; Write instruction to output
