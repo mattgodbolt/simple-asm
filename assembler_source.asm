@@ -146,7 +146,7 @@ JMP  :MAIN_LOOP   ; Jump back to check for special chars
 
 ; Read 4 characters into buffer
 READ_OPCODE:
-LDY# 00     ; Initialize index
+; Y already 0 from MAIN_LOOP
 READ_CHAR:
 LDAY 00     ; Read from (source),Y
 STAY 0005   ; Store to buffer at $0005,Y
