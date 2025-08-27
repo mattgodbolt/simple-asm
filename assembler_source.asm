@@ -217,16 +217,12 @@ JMP  8000   ; Jump to assembled code at $8000
 ; Read operand based on type in $0C
 READ_OPERAND:
 LDAZ 0C     ; Get operand type
-BNE  :CHECK_TYPE_1   ; Not 0, check other types
-JMP  :WRITE_INST   ; Type 0: jump to WRITE_INST
-CHECK_TYPE_1:
-CMP# 01     ; Type 1: single byte
-BNE  :CHECK_TYPE_2   ; Not 1, check type 2
-JSR  :READ_BYTE   ; Type 1: call READ_BYTE
+BEQ  :WRITE_INST   ; Type 0: jump to WRITE_INST
+CMP# 02     ; Is it type 2?
+BEQ  :READ_WORD   ; Type 2: jump to read_WORD
+; Type 1 or 3: both read single byte
+JSR  :READ_BYTE   ; Call READ_BYTE
 JMP  :WRITE_INST   ; Jump to WRITE_INST
-CHECK_TYPE_2:
-CMP# 02     ; Type 2: two bytes
-BNE  :TYPE_3_BRANCH   ; Not 2, must be type 3
 JMP  :READ_WORD   ; Type 2: jump to READ_WORD
 TYPE_3_BRANCH:
 ; Must be type 3: branch
