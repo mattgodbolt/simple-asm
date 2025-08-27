@@ -30,31 +30,109 @@ STAZ 11     ; Store to zero page $11 (effective PC high)
 
 JMP  :MAIN_LOOP   ; Jump to main loop
 
-@0240       ; Align main loop to clean address with room for growth
 ; Main assembly loop
 ; Read 4-character opcode into buffer at $05-$08
 MAIN_LOOP:
 LDY# 00     ; Reset Y to 0
 LDAY 00     ; Peek at first character
 CMP# 21     ; Is it '!' ($21)?
-BNE  :SKIP_EXCLAMATION     ; Not !, skip HANDLE_EXCLAMATION jump
-JMP  :HANDLE_EXCLAMATION
+BNE  :SKIP_EXCLAMATION     ; Not !, skip to next check
+; Fall through to HANDLE_EXCLAMATION
+
+; Handler moved here from $1380 to be within branch range
+HANDLE_EXCLAMATION:
+; Advance source pointer by 1 (skip '!')
+JSR  :ADVANCE_SOURCE
+
+; Read 4 hex digits for new effective address
+JSR  :HEX_TO_BYTE   ; Read first byte (high)
+STAZ 06     ; Store high byte
+JSR  :HEX_TO_BYTE   ; Read second byte (low)
+STAZ 07     ; Store low byte
+
+; Set effective address directly (! sets where code thinks it's running)
+; Effective address is in $06 (high) and $07 (low)
+; This is used for relocation - code may be stored at $8000 but run at $0000
+; Unlike @, this doesn't change the output pointer, only the effective PC
+LDAZ 07     ; Get low byte of directive
+STAZ 10     ; Store as effective PC low (using $10-11 for effective PC)
+LDAZ 06     ; Get high byte of directive
+STAZ 11     ; Store as effective PC high
+
+; Skip newline after directive
+JSR  :ADVANCE_SOURCE
+JMP  :MAIN_LOOP   ; Back to main loop
+
 SKIP_EXCLAMATION:
 CMP# 40     ; Is it '@' ($40)?
-BNE  :SKIP_AT     ; Not @, skip HANDLE_AT jump
-JMP  :HANDLE_AT
+BNE  :SKIP_AT     ; Not @, skip to next check
+; Fall through to HANDLE_AT
+
+; Handler moved here from $1200 to be within branch range
+HANDLE_AT:
+; Advance source pointer by 1 (skip '@')
+JSR  :ADVANCE_SOURCE
+
+; Read 4 hex digits for target effective address
+JSR  :HEX_TO_BYTE   ; Read first byte (high)
+STAZ 06     ; Store high byte
+JSR  :HEX_TO_BYTE   ; Read second byte (low)
+STAZ 07     ; Store low byte
+
+; Calculate target output address
+; If !0000 was used, we're assembling at $8000 but code thinks it's at $0000
+; So @0200 means advance to output $8200 (which is $8000 + $0200)
+CLC
+LDAZ 07     ; Get low byte of target effective
+ADC# 00     ; Add output base low ($8000 & $FF = $00)
+STAZ 02     ; Update output pointer low directly
+LDAZ 06     ; Get high byte of target effective
+ADC# 80     ; Add output base high ($8000 >> 8 = $80)
+STAZ 03     ; Update output pointer high directly
+
+; Update effective PC to target
+LDAZ 07
+STAZ 10     ; Update effective PC low
+LDAZ 06
+STAZ 11     ; Update effective PC high
+
+; Skip newline after directive
+JSR  :ADVANCE_SOURCE
+JMP  :MAIN_LOOP   ; Back to main loop
+
 SKIP_AT:
 CMP# 23     ; Is it '#' ($23)?
-BNE  :SKIP_HASH     ; Not #, skip HANDLE_HASH jump
-JMP  :HANDLE_HASH
+BNE  :SKIP_HASH     ; Not #, skip to next check
+; Fall through to HANDLE_HASH
+
+; Handler moved here from $1280 to be within branch range
+HANDLE_HASH:
+; Advance source pointer by 1 (skip '#')
+JSR  :ADVANCE_SOURCE
+
+; Read hex byte and write to output
+JSR  :HEX_TO_BYTE   ; Read hex byte
+LDY# 00
+STIY 02     ; Write to (output),Y
+
+; Advance output pointer by 1
+JSR  :ADVANCE_OUTPUT
+JMP  :MAIN_LOOP   ; Back to main loop
+
 SKIP_HASH:
 CMP# 22     ; Is it '"' ($22)?
-BNE  :SKIP_STRING     ; Not ", skip HANDLE_STRING jump
-JMP  :HANDLE_STRING
+BNE  :SKIP_STRING     ; Not ", skip to next check
+; Fall through to HANDLE_STRING
+
+; Handler moved here from $1300 to be within branch range
+HANDLE_STRING:
+; Advance source pointer by 1 (skip opening '"')
+JSR  :ADVANCE_SOURCE
+JMP  :STRING_LOOP   ; Jump to STRING_LOOP
+
 SKIP_STRING:
 JMP  :CHAR_HANDLER   ; None of the above, handle as opcode
 
-@0280       ; Align SKIP_SPACES routine
 ; Skip spaces and newlines then read 4-character opcode
 CHAR_HANDLER:
 LDAY 00     ; Read current char (Y already 0 from main loop)
@@ -76,14 +154,10 @@ INY         ; Next character
 CPY# 04     ; Read 4 chars?
 BNE  :READ_CHAR   ; Loop back to read next char
 
-; Advance source pointer by 4
-JSR  :ADVANCE_SOURCE
-JSR  :ADVANCE_SOURCE
-JSR  :ADVANCE_SOURCE
-JSR  :ADVANCE_SOURCE
+; Advance source pointer by 4 - using optimized subroutine
+JSR  :ADVANCE_SOURCE_BY_4
 JMP  :LOOKUP_TABLE   ; Jump to table lookup
 
-@0300       ; Align table lookup section with room for expansion
 ; Look up opcode in table at $1000
 LOOKUP_TABLE:
 LDA# 00     ; Low byte of opcode table at $1000
@@ -140,7 +214,6 @@ BRK         ; Error - opcode not found
 END_FOUND:
 JMP  8000   ; Jump to assembled code at $8000
 
-@0400       ; Align operand reading section
 ; Read operand based on type in $0C
 READ_OPERAND:
 LDAZ 0C     ; Get operand type
@@ -160,7 +233,6 @@ TYPE_3_BRANCH:
 JSR  :READ_BYTE   ; Call READ_BYTE
 JMP  :WRITE_INST   ; Jump to WRITE_INST
 
-@0500       ; Align READ_BYTE routine
 ; Read single byte operand
 READ_BYTE:
 JSR  :HEX_TO_BYTE   ; Call hex conversion
@@ -169,7 +241,6 @@ LDA# 00
 STAZ 0A     ; Clear high byte
 RTS         ; Return to caller
 
-@0540       ; Align READ_WORD routine
 ; Read two-byte operand (little-endian)
 READ_WORD:
 JSR  :HEX_TO_BYTE   ; Call hex conversion
@@ -178,7 +249,6 @@ JSR  :HEX_TO_BYTE   ; Call hex conversion again
 STAZ 09     ; Store as low byte
 JMP  :WRITE_INST   ; Jump to WRITE_INST
 
-@0580       ; Align HEX_TO_BYTE routine
 ; Convert 2 hex digits to byte in A
 ; Advances source pointer by 2
 HEX_TO_BYTE:
@@ -199,7 +269,6 @@ JSR  :ADVANCE_SOURCE   ; Advance past second digit
 LDAZ 04     ; Load result into A before return
 RTS
 
-@05E0       ; Align HEX_NIBBLE routine
 ; Convert single hex ASCII char to nibble (0-F)
 ; Input: A = ASCII char, Output: A = nibble
 HEX_TO_NIBBLE:
@@ -212,7 +281,6 @@ CLC         ; Clear carry for proper subtraction
 SBC# 36     ; Convert 'A'-'F' (subtract 'A'-10-1)
 RTS
 
-@0600       ; Align pointer advancement routines
 ; Advance source pointer by 1
 ADVANCE_SOURCE:
 CLC
@@ -236,8 +304,17 @@ INCZ 03     ; Increment high byte
 SKIP_OUTPUT_INC:
 RTS
 
+; Advance source pointer by 4 - optimized version of 4x JSR :ADVANCE_SOURCE
+ADVANCE_SOURCE_BY_4:
+CLC
+LDAZ 00     ; Get source pointer low byte
+ADC# 04     ; Add 4
+STAZ 00     ; Store back
+BCC  :SKIP_SOURCE_BY_4_INC  ; Skip if no carry
+INCZ 01     ; Increment high byte
+SKIP_SOURCE_BY_4_INC:
+RTS
 
-@0E00       ; Align WRITE_INST routine
 ; Write instruction to output
 WRITE_INST:
 LDY# 00     ; Initialize output index
@@ -286,7 +363,6 @@ JSR  :ADVANCE_OUTPUT
 JSR  :ADVANCE_OUTPUT
 JMP  :MAIN_LOOP   ; Jump to main loop
 
-@0F80       ; Align data section
 ; Done! Jump to assembled program would be here, but now handled earlier
 
 ; Minimal opcode table - just what counter.punch needs
@@ -423,64 +499,7 @@ JMP  :MAIN_LOOP   ; Jump to main loop
 #E9
 #01
 
-@1100       ; Reserved for future use
-
-@1200       ; @ directive handler
-; Handle @xxxx - advance effective PC and output pointer
-HANDLE_AT:
-; Advance source pointer by 1 (skip '@')
-JSR  :ADVANCE_SOURCE
-
-; Read 4 hex digits for target effective address
-JSR  :HEX_TO_BYTE   ; Read first byte (high)
-STAZ 06     ; Store high byte
-JSR  :HEX_TO_BYTE   ; Read second byte (low)
-STAZ 07     ; Store low byte
-
-; Calculate target output address
-; If !0000 was used, we're assembling at $8000 but code thinks it's at $0000
-; So @0200 means advance to output $8200 (which is $8000 + $0200)
-CLC
-LDAZ 07     ; Get low byte of target effective
-ADC# 00     ; Add output base low ($8000 & $FF = $00)
-STAZ 02     ; Update output pointer low directly
-LDAZ 06     ; Get high byte of target effective
-ADC# 80     ; Add output base high ($8000 >> 8 = $80)
-STAZ 03     ; Update output pointer high directly
-
-; Update effective PC to target
-LDAZ 07
-STAZ 10     ; Update effective PC low
-LDAZ 06
-STAZ 11     ; Update effective PC high
-
-; Skip newline after directive
-JSR  :ADVANCE_SOURCE
-JMP  :MAIN_LOOP   ; Back to main loop
-
-@1280       ; # hex data handler
-; Handle #xx - read hex byte and write to output
-HANDLE_HASH:
-; Advance source pointer by 1 (skip '#')
-JSR  :ADVANCE_SOURCE
-
-; Read hex byte and write to output
-JSR  :HEX_TO_BYTE   ; Read hex byte
-LDY# 00
-STIY 02     ; Write to (output),Y
-
-; Advance output pointer by 1
-JSR  :ADVANCE_OUTPUT
-JMP  :MAIN_LOOP   ; Back to main loop
-
-@1300       ; " string data handler
-; Handle "text" - read string until closing quote and write to output
-HANDLE_STRING:
-; Advance source pointer by 1 (skip opening '"')
-JSR  :ADVANCE_SOURCE
-JMP  :STRING_LOOP   ; Jump to STRING_LOOP
-
-@1320       ; Align STRING_LOOP routine
+@1100       ; STRING_LOOP moved here from $1320
 ; Read characters until closing quote
 STRING_LOOP:
 LDY# 00     ; Reset Y to 0
@@ -489,7 +508,6 @@ CMP# 22     ; Is it '"'?
 BEQ  :STRING_DONE   ; Yes, done with string
 
 ; Write character to output
-LDY# 00
 STIY 02     ; Write to (output),Y
 
 ; Advance both pointers
@@ -502,34 +520,8 @@ STRING_DONE:
 JSR  :ADVANCE_SOURCE   ; Advance source pointer
 JMP  :MAIN_LOOP   ; Back to main loop
 
-@1380       ; ! directive handler
-; Handle !xxxx - set effective address (for relocation)
-HANDLE_EXCLAMATION:
-; Advance source pointer by 1 (skip '!')
-JSR  :ADVANCE_SOURCE
-
-; Read 4 hex digits for new effective address
-JSR  :HEX_TO_BYTE   ; Read first byte (high)
-STAZ 06     ; Store high byte
-JSR  :HEX_TO_BYTE   ; Read second byte (low)
-STAZ 07     ; Store low byte
-
-; Set effective address directly (! sets where code thinks it's running)
-; Effective address is in $06 (high) and $07 (low)
-; This is used for relocation - code may be stored at $8000 but run at $0000
-; Unlike @, this doesn't change the output pointer, only the effective PC
-LDAZ 07     ; Get low byte of directive
-STAZ 10     ; Store as effective PC low (using $10-11 for effective PC)
-LDAZ 06     ; Get high byte of directive
-STAZ 11     ; Store as effective PC high
-
-; Note: We need to track effective PC separately from output pointer
-; Output pointer ($02-03) is where we write
-; Effective PC ($10-11) is what address the code thinks it's at
-
-; Skip newline after directive
-JSR  :ADVANCE_SOURCE
-JMP  :MAIN_LOOP   ; Back to main loop
+; Handlers have been moved inline with main loop for branch optimization
+; This space now available for future use
 
 ; End of assembler program
 END

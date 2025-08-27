@@ -20,7 +20,7 @@ Research project exploring 6502 assembly and bootstrapping. Focus on historical 
 ### Assembly Coding Standards
 
 **Memory Layout:**
-- Always align jump targets and data to known locations with `@xxxx` directives
+- Use labels for all jump targets. Only use `@xxxx` directives for critical memory locations (e.g., opcode table at $1000)
 - Use `@` to ensure critical code sections land at predictable addresses
 
 **Control Flow:**
