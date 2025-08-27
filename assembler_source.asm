@@ -44,11 +44,7 @@ HANDLE_EXCLAMATION:
 ; ! sets where code thinks it's running (relocation)
 ; Unlike @, this doesn't change the output pointer, only the effective PC
 JSR  :READ_DIRECTIVE_ADDR   ; Read address into $06/$07
-; Update effective PC
-LDAZ 07     ; Get low byte of directive
-STAZ 10     ; Store as effective PC low
-LDAZ 06     ; Get high byte of directive
-STAZ 11     ; Store as effective PC high
+JSR  :STORE_EFFECTIVE_PC    ; Update effective PC
 JMP  :MAIN_LOOP   ; Back to main loop
 
 SKIP_EXCLAMATION:
@@ -60,12 +56,7 @@ BNE  :SKIP_AT     ; Not @, skip to next check
 HANDLE_AT:
 ; Read directive address
 JSR  :READ_DIRECTIVE_ADDR
-
-; Update effective PC
-LDAZ 07     ; Get low byte of directive
-STAZ 10     ; Store as effective PC low
-LDAZ 06     ; Get high byte of directive
-STAZ 11     ; Store as effective PC high
+JSR  :STORE_EFFECTIVE_PC    ; Update effective PC
 
 ; Calculate target output address
 ; If !0000 was used, we're assembling at $8000 but code thinks it's at $0000
@@ -506,7 +497,14 @@ JSR  :ADVANCE_SOURCE   ; Advance source pointer
 JMP  :MAIN_LOOP   ; Back to main loop
 
 ; Handlers have been moved inline with main loop for branch optimization
-; This space now available for future use
+; Store $06/$07 to effective PC ($10/$11)
+; Common subroutine for both ! and @ handlers
+STORE_EFFECTIVE_PC:
+LDAZ 07     ; Get low byte
+STAZ 10     ; Store as effective PC low
+LDAZ 06     ; Get high byte
+STAZ 11     ; Store as effective PC high
+RTS
 
 ; End of assembler program
 END
